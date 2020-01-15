@@ -17,7 +17,7 @@ It's quite simple to start the app. A basic CLI made with the standard `flag` pa
 options like the configuration file to create probes.
 
 ```
-$ madprobe -config /opt/probes/dummy.yaml
+$ madprobe -yamlConfig /opt/probes/dummy.yaml
 ```
 
 If you don't specify any options, by default, the application will search for a configuration file located
@@ -25,7 +25,7 @@ in `./test/sample.yml`
 
 Each probe will run it's in own goroutine and will perform their checks independently.
 
-An example of configuration can be found [here](test/sample.yml).
+An example of configuration can be found [here](configs/sample.yml).
 
 ## Contributing
 
