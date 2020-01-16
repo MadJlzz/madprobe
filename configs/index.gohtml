@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <!--<meta http-equiv="refresh" content="30">-->
+    <meta http-equiv="refresh" content="15">
     <title>MadProbe - Service availability</title>
     <style>
         .center {
@@ -35,13 +35,15 @@
 </head>
 <body>
 <div class="center">
-    <div class="card">
-        <img src="../assets/img_avatar.png" alt="Avatar" style="width:100%">
-        <div class="container">
-            <h4><b>John Doe</b></h4>
-            <p>Architect & Engineer</p>
+    {{ range $key, $value := . }}
+        <div class="card">
+            <img src="https://picsum.photos/seed/{{ $key }}/500" alt="Random picture" style="width:100%">
+            <div class="container">
+                <h4><b>{{ $key }}</b></h4>
+                <p>{{ $value }}</p>
+            </div>
         </div>
-    </div>
+    {{ end }}
 </div>
 </body>
 </html>

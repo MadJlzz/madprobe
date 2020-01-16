@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	yamlConfig = flag.String("yamlConfig", "configs/sample.yml", "configuration file used to define probes")
-	port       = flag.Int("port", 8081, "port webapp application will listen to")
-	tplConfig  = flag.String("templateConfig", "configs/index.gohtml", "configuration file used to render app")
+	yamlConfig     = flag.String("yamlConfig", "configs/sample.yml", "configuration file used to define probes")
+	port           = flag.Int("port", 8081, "port webapp application will listen to")
+	templateConfig = flag.String("templateConfig", "configs/index.gohtml", "configuration file used to render app")
 )
 
 func main() {
@@ -37,11 +37,12 @@ func main() {
 		log.Fatalf("error occured while trying to unmarshal yaml file: got '%s'", err)
 	}
 
-	probe.Run(&probes)
-	server.StartApp(server.WebApp{
-		Port:        *port,
-		TemplateSrc: *tplConfig,
-	})
+	app := &server.App{
+		Port:           *port,
+		TemplateSource: *templateConfig,
+	}
+	probe.Run(&probes, app)
+	server.StartApp(app)
 
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, os.Interrupt)
