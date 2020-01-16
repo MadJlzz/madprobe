@@ -1,7 +1,6 @@
 # Madprobe
 
-This project has been made to provide company wanting simple liveness probe to be easily
-installed on their systems.
+This project has been made to provide company wanting simple aliveness probe to be easily installed on their systems.
 
 ## Getting Started
 
@@ -17,19 +16,22 @@ It's quite simple to start the app. A basic CLI made with the standard `flag` pa
 options like the configuration file to create probes.
 
 ```
-$ madprobe -config /opt/probes/dummy.yaml
+$ madprobe -yamlConfig /path/to/probes/config -port 6666 -templateConfig /path/to/golang/html/template
 ```
 
 If you don't specify any options, by default, the application will search for a configuration file located
-in `./test/sample.yml`
+in `./configs/sample.yml` for the probe configuration, in `configs/index.gohtml` for the template configuration and
+will start a webserver on port `8081`
 
 Each probe will run it's in own goroutine and will perform their checks independently.
 
-An example of configuration can be found [here](test/sample.yml).
+An example of probes configuration can be found [here](configs/sample.yml).
+
+To serve the same purpose, a Golang HTML template has been already written [here](configs/index.gohtml)
 
 ## Contributing
 
-I'll be more than happy to have feedbacks on the way I designed this application. Things can always be done better and
+I'll be more than happy to have feedback on the way I designed this application. Things can always be done better and
 I m eager to learn what could be improved!
 
 ## License
