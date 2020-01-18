@@ -1,10 +1,11 @@
 # Definition of PID .
 pid:
   - name: simple-service-pid # Name of the probe. Useful to declare the service we are probing.
-    hostname: localhost # Name of the hostname we need to SSH into.
-    service-account: madjlzz # Name of the user used to start a new SSH connection.
-    pid: 26695 # For the PID probe, this is just a basic check on the server for the PID.
-    delay: 30 # Every 30 seconds, a check will be performed to check if the service is actually running.
+    hostname: 34.76.168.242 # Name of the hostname we need to SSH into.
+    port: 22 # Port number of the SSH server to dial.
+    service-account: klaer # Name of the user used to start a new SSH connection.
+    pid: 1 # For the PID probe, this is just a basic check on the server for the PID.
+    delay: 5 # Every 30 seconds, a check will be performed to check if the service is actually running.
 
 # Definition of HTTP probes.
 http:
