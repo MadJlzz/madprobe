@@ -1,0 +1,25 @@
+# In this file you will find several PID probe configuration.
+# Below is an explanation of every field used to configure a PID probe.
+
+# pid:
+# - name: Name of the probe. Useful to declare the service we are probing.
+#   hostname: Name of the hostname we need to SSH into.
+#   port: Port number of the SSH server to dial.
+#   service-account: Name of the user used to start a new SSH connection.
+#   pid: For the PID probe, this is just a basic check on the server for the PID.
+#   delay: Every 30 seconds, a check will be performed to check if the service is actually running.
+
+pid:
+  - name: remote-pid-probe
+    hostname: 34.76.168.242
+    port: 22
+    service-account: klaer
+    pid: 1
+    delay: 5
+
+  - name: local-pid-probe
+    hostname: localhost
+    port: 22
+    service-account: klaer
+    pid: 1
+    delay: 5
