@@ -81,7 +81,12 @@ func (pc *ProbeController) Delete(w http.ResponseWriter, req *http.Request) {
 
 	err := pc.ProbeService.Delete(vars["name"])
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		switch err {
+		case service.ErrProbeNotFound:
+			http.Error(w, err.Error(), http.StatusNotFound)
+		default:
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
 		return
 	}
 
