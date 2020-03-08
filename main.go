@@ -26,6 +26,8 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/api/v1/probe/create", probeController.Create).
 		Methods(http.MethodPost)
+	r.HandleFunc("/api/v1/probe/{name}", probeController.Delete).
+		Methods(http.MethodDelete)
 
 	srv := &http.Server{
 		Addr: "0.0.0.0:" + port,

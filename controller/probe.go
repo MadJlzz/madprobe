@@ -5,6 +5,7 @@ package controller
 import (
 	"errors"
 	"fmt"
+	"github.com/gorilla/mux"
 	"github.com/madjlzz/madprobe/internal/service"
 	"log"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 // to manipulate probes.
 type ProbeService interface {
 	Create(probe service.Probe) error
+	Delete(name string) error
 }
 
 // CreateProbeRequest represents the data structure
@@ -57,8 +59,6 @@ func (pc *ProbeController) Create(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Call the service layer in order to persist the probe.
-	// Bad thing is that we cannot mock the call as is.
 	err = pc.ProbeService.Create(service.Probe{
 		Name:  cpr.Name,
 		URL:   cpr.URL,
@@ -70,4 +70,20 @@ func (pc *ProbeController) Create(w http.ResponseWriter, req *http.Request) {
 	}
 
 	_, _ = fmt.Fprintf(w, "Probe [%s] has been successfuly created.", cpr.Name)
+}
+
+// Delete allows consumer to delete an existing probe in the system.
+// It will return a HTTP 200 status code if it succeeds, a human readable error otherwise.
+//
+// DELETE /api/v1/probe/{name}
+func (pc *ProbeController) Delete(w http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+
+	err := pc.ProbeService.Delete(vars["name"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	_, _ = fmt.Fprintf(w, "Probe [%s] has been successfuly deleted.", vars["name"])
 }

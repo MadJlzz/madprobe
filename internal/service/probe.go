@@ -3,11 +3,15 @@
 package service
 
 import (
+	"errors"
 	"log"
 	"net/http"
-	"os"
 	"sync"
 	"time"
+)
+
+var (
+	ErrProbeNotFound = errors.New("probe was not found")
 )
 
 // Once is an object that will perform exactly one action.
@@ -19,10 +23,10 @@ var instance *ProbeService
 // Probe is the model required by the service to manipulate
 // the resource.
 type Probe struct {
-	Name     string
-	URL      string
-	Delay    uint
-	receiver chan int
+	Name   string
+	URL    string
+	Delay  uint
+	finish chan bool
 }
 
 // ProbeService is an implementation
@@ -42,16 +46,15 @@ func NewProbeService() *ProbeService {
 	return instance
 }
 
-// Create does nothing but printing the given probe to the service layer.
-// In the future, we should validate data received from the controller layer
-// and find a way to persist it.
+// Create does nothing but registering the given probe.
+// Validation is made before storing the probe to be sure nothing partially configured enters the system.
 func (ps *ProbeService) Create(probe Probe) error {
 	err := runValidators(probe, nameInvalid, urlInvalid, delayInvalid)
 	if err != nil {
 		return err
 	}
 
-	probe.receiver = make(chan int, 1)
+	probe.finish = make(chan bool, 1)
 	ps.probes[probe.Name] = probe
 
 	go run(probe)
@@ -60,18 +63,38 @@ func (ps *ProbeService) Create(probe Probe) error {
 	return nil
 }
 
+// Delete erase an existing probe from the system.
+// Validation is made before deletion to be sure nothing get removed by error.
+func (ps *ProbeService) Delete(name string) error {
+	probe := Probe{Name: name}
+	err := runValidators(probe, nameInvalid)
+	if err != nil {
+		return err
+	}
+
+	probe, ok := ps.probes[name]
+	if !ok {
+		return ErrProbeNotFound
+	}
+
+	probe.finish <- true
+	delete(ps.probes, probe.Name)
+
+	return nil
+}
+
 func run(probe Probe) {
 	for {
 		select {
-		case <-probe.receiver:
-			log.Printf("<<HTTP PROBE [%s]>> stopping probe...\n", probe.Name)
-			os.Exit(0)
+		case <-probe.finish:
+			log.Printf("<<HTTP PROBE [%s]>> Stopping probe...\n", probe.Name)
+			return
 		default:
 			resp, err := http.Get(probe.URL)
 			if err != nil {
-				log.Printf("<<HTTP PROBE [%s]>> an error occured while doing HTTP call to [%s]. got '%s'\n", probe.Name, probe.URL, err)
+				log.Printf("<<HTTP PROBE [%s]>> Service targeting [%s] is down.\n", probe.Name, probe.URL)
 			} else {
-				log.Printf("<<HTTP PROBE [%s]>> Service is alive.\n", probe.Name)
+				log.Printf("<<HTTP PROBE [%s]>> Service targeting [%s] is alive.\n", probe.Name, probe.URL)
 				_ = resp.Body.Close()
 			}
 		}
