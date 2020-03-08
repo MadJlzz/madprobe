@@ -65,7 +65,12 @@ func (pc *ProbeController) Create(w http.ResponseWriter, req *http.Request) {
 		Delay: cpr.Delay,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		switch err {
+		case service.ErrProbeAlreadyExist:
+			http.Error(w, err.Error(), http.StatusConflict)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -85,7 +90,7 @@ func (pc *ProbeController) Delete(w http.ResponseWriter, req *http.Request) {
 		case service.ErrProbeNotFound:
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}

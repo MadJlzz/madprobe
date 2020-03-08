@@ -11,7 +11,8 @@ import (
 )
 
 var (
-	ErrProbeNotFound = errors.New("probe was not found")
+	ErrProbeAlreadyExist = errors.New("probe with this name already exists")
+	ErrProbeNotFound     = errors.New("probe was not found")
 )
 
 // Once is an object that will perform exactly one action.
@@ -52,6 +53,9 @@ func (ps *ProbeService) Create(probe Probe) error {
 	err := runValidators(probe, nameInvalid, urlInvalid, delayInvalid)
 	if err != nil {
 		return err
+	}
+	if _, ok := ps.probes[probe.Name]; ok {
+		return ErrProbeAlreadyExist
 	}
 
 	probe.finish = make(chan bool, 1)
