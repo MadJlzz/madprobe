@@ -64,6 +64,10 @@ func (pc *ProbeController) Create(w http.ResponseWriter, req *http.Request) {
 		URL:   cpr.URL,
 		Delay: cpr.Delay,
 	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	_, _ = fmt.Fprintf(w, "CreateProbeRequest: %+v", cpr)
 }
