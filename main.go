@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/madjlzz/madprobe/controller"
 	"github.com/madjlzz/madprobe/internal/service"
@@ -18,7 +17,7 @@ func main() {
 	var wait time.Duration
 	flag.DurationVar(&wait, "graceful-timeout", time.Second*15, "the duration for which the server gracefully wait for existing connections to finish - e.g. 15s or 1m")
 	var port string
-	flag.StringVar(&port, "port", "8080", "the port for which the server will start to listen to")
+	flag.StringVar(&port, "port", "3000", "the port for which the server will start to listen to")
 	flag.Parse()
 
 	probeService := service.NewProbeService()
@@ -39,7 +38,7 @@ func main() {
 
 	// Run our server in a goroutine so that it doesn't block.
 	go func() {
-		fmt.Printf("Starting our server on port %s...\n", port)
+		log.Printf("Starting our server on port %s...\n", port)
 		if err := srv.ListenAndServe(); err != nil {
 			log.Println(err)
 		}

@@ -3,7 +3,7 @@
 package service
 
 import (
-	"fmt"
+	"log"
 	"sync"
 )
 
@@ -42,6 +42,6 @@ func (ps *ProbeService) Create(probe Probe) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Probe: +%v has been successfully created.\n", probe)
+	log.Printf("Probe [%s] has been successfuly created.\n", probe.Name)
 	return nil
 }

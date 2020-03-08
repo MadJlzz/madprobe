@@ -69,5 +69,5 @@ func (pc *ProbeController) Create(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	_, _ = fmt.Fprintf(w, "CreateProbeRequest: %+v", cpr)
+	_, _ = fmt.Fprintf(w, "Probe [%s] has been successfuly created.", cpr.Name)
 }
