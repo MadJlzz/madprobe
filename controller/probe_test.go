@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"fmt"
+	"github.com/madjlzz/madprobe/internal/service"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -23,9 +25,11 @@ func TestCreateProbeHandler(t *testing.T) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
+	controller := NewProbeController(&fakeProbeService{})
+
 	// We create a ResponseRecorder (which satisfies http.ResponseWriter) to record the response.
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(Create)
+	handler := http.HandlerFunc(controller.Create)
 
 	// Our handlers satisfy http.Handler, so we can call their ServeHTTP method
 	// directly and pass in our Request and ResponseRecorder.
@@ -43,4 +47,11 @@ func TestCreateProbeHandler(t *testing.T) {
 		t.Errorf("handler returned unexpected body: got %v want %v",
 			rr.Body.String(), expected)
 	}
+}
+
+type fakeProbeService struct{}
+
+func (ps *fakeProbeService) Create(_ service.Probe) error {
+	fmt.Println("Calling Create() from mock ProbeService.")
+	return nil
 }

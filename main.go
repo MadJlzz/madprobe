@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/madjlzz/madprobe/controller"
+	"github.com/madjlzz/madprobe/internal/service"
 	"log"
 	"net/http"
 	"os"
@@ -20,8 +21,11 @@ func main() {
 	flag.StringVar(&port, "port", "8080", "the port for which the server will start to listen to")
 	flag.Parse()
 
+	probeService := service.NewProbeService()
+	probeController := controller.NewProbeController(probeService)
+
 	r := mux.NewRouter()
-	r.HandleFunc("/api/v1/probe/create", controller.Create).
+	r.HandleFunc("/api/v1/probe/create", probeController.Create).
 		Methods(http.MethodPost)
 
 	srv := &http.Server{
