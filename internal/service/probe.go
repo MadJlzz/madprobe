@@ -67,6 +67,16 @@ func (ps *ProbeService) Create(probe Probe) error {
 	return nil
 }
 
+// Read retrieve a probe with the given name in the system.
+// No validation is required. Returns the probe or ErrProbeNotFound is not probe has been found.
+func (ps *ProbeService) Read(name string) (*Probe, error) {
+	probe, ok := ps.probes[name]
+	if !ok {
+		return nil, ErrProbeNotFound
+	}
+	return &probe, nil
+}
+
 // Delete erase an existing probe from the system.
 // Validation is made before deletion to be sure nothing get removed by error.
 func (ps *ProbeService) Delete(name string) error {

@@ -15,12 +15,23 @@ import (
 // to manipulate probes.
 type ProbeService interface {
 	Create(probe service.Probe) error
+	Read(name string) (*service.Probe, error)
+	// ReadAll() error
 	Delete(name string) error
 }
 
 // CreateProbeRequest represents the data structure
 // decoded from incoming HTTP request when trying to create a new probe.
 type CreateProbeRequest struct {
+	Name  string
+	URL   string
+	Delay uint
+}
+
+// ProbeResponse represents the data structure
+// send to clients when they are trying to fetch information from the API.
+// It is encoded in JSON.
+type ProbeResponse struct {
 	Name  string
 	URL   string
 	Delay uint
@@ -49,7 +60,7 @@ func (pc *ProbeController) Create(w http.ResponseWriter, req *http.Request) {
 
 	err := decodeJSONBody(w, req, &cpr)
 	if err != nil {
-		var mr *malformedRequest
+		var mr *malformedContent
 		if errors.As(err, &mr) {
 			http.Error(w, mr.msg, mr.status)
 		} else {
@@ -75,6 +86,43 @@ func (pc *ProbeController) Create(w http.ResponseWriter, req *http.Request) {
 	}
 
 	_, _ = fmt.Fprintf(w, "Probe [%s] has been successfuly created.", cpr.Name)
+}
+
+// Read allows consumer to retrieve a probe in the system given it's name.
+// It will return a HTTP 200 status code with the probe's details if it succeeds, a human readable error otherwise.
+//
+// GET /api/v1/probe/{name}
+func (pc *ProbeController) Read(w http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+
+	probe, err := pc.ProbeService.Read(vars["name"])
+	if err != nil {
+		switch err {
+		case service.ErrProbeNotFound:
+			http.Error(w, err.Error(), http.StatusNotFound)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Encode the probe in json and send it over to the client
+	pr := ProbeResponse{
+		Name:  probe.Name,
+		URL:   probe.URL,
+		Delay: probe.Delay,
+	}
+	err = encodeJSONBody(w, &pr)
+	if err != nil {
+		var mr *malformedContent
+		if errors.As(err, &mr) {
+			http.Error(w, mr.msg, mr.status)
+		} else {
+			log.Println(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+		return
+	}
 }
 
 // Delete allows consumer to delete an existing probe in the system.
