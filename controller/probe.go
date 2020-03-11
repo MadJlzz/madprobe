@@ -141,7 +141,7 @@ func (pc *ProbeController) Read(w http.ResponseWriter, req *http.Request) {
 func (pc *ProbeController) ReadAll(w http.ResponseWriter, req *http.Request) {
 	probes := pc.ProbeService.ReadAll()
 
-	var pr []ProbeResponse
+	pr := make([]ProbeResponse, 0)
 	for _, value := range probes {
 		pr = append(pr, ProbeResponse{
 			Name:  value.Name,
