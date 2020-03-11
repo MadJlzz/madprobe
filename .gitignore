@@ -110,3 +110,7 @@ modules.xml
 .idea/sonarlint
 
 # End of https://www.gitignore.io/api/go,intellij+all
+
+# Generated self signed certificates
+configs/certs/*.csr
+configs/certs/*.pem

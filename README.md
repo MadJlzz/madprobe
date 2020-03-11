@@ -21,8 +21,21 @@ options like the port on which the server should listen.
 $ ./madprobe -port 6666 -graceful-timeout 5
 ```
 
-If you don't specify any options, by default, the application will start a webserver on port `3000`
+If you don't specify any options, by default, the application will start a HTTP webserver on port `3000`
 and provide a graceful timeout of `15 seconds`.
+
+If you want to run the server in HTTPs, you need to pass more arguments to the command line:
+```
+$ ./madprobe -cert configs/certs/public.pem -key configs/certs/key.pem
+```
+
+Do not forget to set the `-ca-cert` flag if you desire your probes to do HTTPS requests.
+```
+$ ./madprobe -cert configs/certs/public.pem -key configs/certs/key.pem -ca-cert configs/certs/cacert.pem
+```
+
+If you want to generate basic certificates, please look in the configs/certs directory.
+`gencert.sh` is based on `cfssl` and `cfssljson` which are easier to use than `openssl`.
 
 Each probe will run it's in own goroutine and will perform their checks independently.
 
@@ -33,8 +46,6 @@ state of probes.
 
 For now, there is no probe persistence so stopping `madprobe` will result in losing all
 probes states.
-
-> :warning: **HTTP(s) is not supported yet**: Be very careful before exposing anything!
 
 Endpoints: 
   - POST /api/v1/probe/create

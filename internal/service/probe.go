@@ -4,6 +4,7 @@ package service
 
 import (
 	"errors"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"sync"
@@ -33,14 +34,16 @@ type Probe struct {
 // ProbeService is an implementation
 // of the interface controller.ProbeService
 type ProbeService struct {
+	client *http.Client
 	probes map[string]Probe
 }
 
 // NewProbeService allow to create a new ProbeService
 // implemented as a singleton.
-func NewProbeService() *ProbeService {
+func NewProbeService(client *http.Client) *ProbeService {
 	once.Do(func() {
 		instance = &ProbeService{
+			client: client,
 			probes: make(map[string]Probe),
 		}
 	})
@@ -61,7 +64,7 @@ func (ps *ProbeService) Create(probe Probe) error {
 	probe.finish = make(chan bool, 1)
 	ps.probes[probe.Name] = probe
 
-	go run(probe)
+	go ps.run(probe)
 
 	log.Printf("Probe [%s] has been successfuly created.\n", probe.Name)
 	return nil
@@ -106,7 +109,7 @@ func (ps *ProbeService) Update(name string, probe Probe) error {
 	probe.finish = make(chan bool, 1)
 	ps.probes[probe.Name] = probe
 
-	go run(probe)
+	go ps.run(probe)
 
 	log.Printf("Probe [%s] has been successfuly updated.\n", probe.Name)
 	return nil
@@ -132,18 +135,22 @@ func (ps *ProbeService) Delete(name string) error {
 	return nil
 }
 
-func run(probe Probe) {
+// run launch probes in a separate goroutine.
+func (ps *ProbeService) run(probe Probe) {
 	for {
 		select {
 		case <-probe.finish:
 			log.Printf("<<HTTP PROBE [%s]>> Stopping probe...\n", probe.Name)
 			return
 		default:
-			resp, err := http.Get(probe.URL)
+			resp, err := ps.client.Get(probe.URL)
 			if err != nil {
-				log.Printf("<<HTTP PROBE [%s]>> Service targeting [%s] is down.\n", probe.Name, probe.URL)
+				log.Printf("<<HTTP(s) PROBE [%s]>> Service targeting [%s] is down.\n", probe.Name, probe.URL)
+			} else if resp.StatusCode != 200 {
+				b, _ := ioutil.ReadAll(resp.Body)
+				log.Printf("<<HTTP(s) PROBE [%s]>> Service targeting [%s] returned an error. got: ['%v']\n", probe.Name, probe.URL, string(b))
 			} else {
-				log.Printf("<<HTTP PROBE [%s]>> Service targeting [%s] is alive.\n", probe.Name, probe.URL)
+				log.Printf("<<HTTP(s) PROBE [%s]>> Service targeting [%s] is alive.\n", probe.Name, probe.URL)
 				_ = resp.Body.Close()
 			}
 		}

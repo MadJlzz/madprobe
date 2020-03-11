@@ -1,0 +1,19 @@
+{
+  "CN": "madprobe.client.internal",
+  "hosts": [
+    ""
+  ],
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "OU": "MadProbe Client",
+      "O": "MadLab",
+      "L": "Luxembourg",
+      "ST": "Luxembourg",
+      "C": "Luxembourg"
+    }
+  ]
+}

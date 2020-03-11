@@ -1,0 +1,16 @@
+{
+  "CN": "Madprobe Certificate Authority",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "OU": "MadLab CA",
+      "O": "MadLab",
+      "L": "Luxembourg",
+      "ST": "Luxembourg",
+      "C": "Luxembourg"
+    }
+  ]
+}
