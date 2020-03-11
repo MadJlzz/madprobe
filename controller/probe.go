@@ -16,7 +16,7 @@ import (
 type ProbeService interface {
 	Create(probe service.Probe) error
 	Read(name string) (*service.Probe, error)
-	// ReadAll() error
+	ReadAll() []service.Probe
 	Delete(name string) error
 }
 
@@ -113,6 +113,35 @@ func (pc *ProbeController) Read(w http.ResponseWriter, req *http.Request) {
 		Delay: probe.Delay,
 	}
 	err = encodeJSONBody(w, &pr)
+	if err != nil {
+		var mr *malformedContent
+		if errors.As(err, &mr) {
+			http.Error(w, mr.msg, mr.status)
+		} else {
+			log.Println(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+		return
+	}
+}
+
+// ReadAll allows consumer to retrieve all probe existing in the system.
+// It will return a HTTP 200 status code with all probe's details if it succeeds, a human readable error otherwise.
+//
+// GET /api/v1/probe
+func (pc *ProbeController) ReadAll(w http.ResponseWriter, req *http.Request) {
+	probes := pc.ProbeService.ReadAll()
+
+	var pr []ProbeResponse
+	for _, value := range probes {
+		pr = append(pr, ProbeResponse{
+			Name:  value.Name,
+			URL:   value.URL,
+			Delay: value.Delay,
+		})
+	}
+
+	err := encodeJSONBody(w, &pr)
 	if err != nil {
 		var mr *malformedContent
 		if errors.As(err, &mr) {

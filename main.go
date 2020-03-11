@@ -28,6 +28,8 @@ func main() {
 		Methods(http.MethodPost)
 	r.HandleFunc("/api/v1/probe/{name}", probeController.Read).
 		Methods(http.MethodGet)
+	r.HandleFunc("/api/v1/probe", probeController.ReadAll).
+		Methods(http.MethodGet)
 	r.HandleFunc("/api/v1/probe/{name}", probeController.Delete).
 		Methods(http.MethodDelete)
 

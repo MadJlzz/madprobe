@@ -77,6 +77,15 @@ func (ps *ProbeService) Read(name string) (*Probe, error) {
 	return &probe, nil
 }
 
+// ReadAll retrieve all probes in the system.
+func (ps *ProbeService) ReadAll() []Probe {
+	var probes []Probe
+	for _, value := range ps.probes {
+		probes = append(probes, value)
+	}
+	return probes
+}
+
 // Delete erase an existing probe from the system.
 // Validation is made before deletion to be sure nothing get removed by error.
 func (ps *ProbeService) Delete(name string) error {
