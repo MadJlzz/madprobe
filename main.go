@@ -1,52 +1,74 @@
 package main
 
 import (
+	"context"
 	"flag"
-	"github.com/go-yaml/yaml"
-	"github.com/madjlzz/madprobe/internal/probe"
-	"github.com/madjlzz/madprobe/internal/server"
-	"io/ioutil"
+	"github.com/gorilla/mux"
+	"github.com/madjlzz/madprobe/controller"
+	"github.com/madjlzz/madprobe/internal/service"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
-)
-
-var (
-	yamlConfig     = flag.String("yamlConfig", "configs/sample.yml", "configuration file used to define probes")
-	port           = flag.Int("port", 8081, "port webapp application will listen to")
-	templateConfig = flag.String("templateConfig", "configs/index.gohtml", "configuration file used to render app")
+	"time"
 )
 
 func main() {
+	var wait time.Duration
+	flag.DurationVar(&wait, "graceful-timeout", time.Second*15, "the duration for which the server gracefully wait for existing connections to finish - e.g. 15s or 1m")
+	var port string
+	flag.StringVar(&port, "port", "3000", "the port for which the server will start to listen to")
 	flag.Parse()
 
-	f, err := os.Open(*yamlConfig)
-	if err != nil {
-		log.Fatalf("error occured while trying to open file: got '%s'", err)
+	probeService := service.NewProbeService()
+	probeController := controller.NewProbeController(probeService)
+
+	r := mux.NewRouter()
+	r.HandleFunc("/api/v1/probe/create", probeController.Create).
+		Methods(http.MethodPost)
+	r.HandleFunc("/api/v1/probe/{name}", probeController.Read).
+		Methods(http.MethodGet)
+	r.HandleFunc("/api/v1/probe", probeController.ReadAll).
+		Methods(http.MethodGet)
+	r.HandleFunc("/api/v1/probe/{name}", probeController.Update).
+		Methods(http.MethodPut)
+	r.HandleFunc("/api/v1/probe/{name}", probeController.Delete).
+		Methods(http.MethodDelete)
+
+	srv := &http.Server{
+		Addr: "0.0.0.0:" + port,
+		// Good practice to set timeouts to avoid Slowloris attacks.
+		WriteTimeout: time.Second * 15,
+		ReadTimeout:  time.Second * 15,
+		IdleTimeout:  time.Second * 60,
+		Handler:      r, // Pass our instance of gorilla/mux in.
 	}
-	defer f.Close()
 
-	data, err := ioutil.ReadAll(f)
-	if err != nil {
-		log.Fatalf("error occured while trying to read content of file: got '%s'", err)
-	}
+	// Run our server in a goroutine so that it doesn't block.
+	go func() {
+		log.Printf("Starting our server on port %s...\n", port)
+		if err := srv.ListenAndServe(); err != nil {
+			log.Println(err)
+		}
+	}()
 
-	var probes probe.Probes
-	err = yaml.Unmarshal(data, &probes)
-	if err != nil {
-		log.Fatalf("error occured while trying to unmarshal yaml file: got '%s'", err)
-	}
+	c := make(chan os.Signal, 1)
+	// We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C)
+	// SIGKILL, SIGQUIT or SIGTERM (Ctrl+/) will not be caught.
+	signal.Notify(c, os.Interrupt)
 
-	app := &server.App{
-		Port:           *port,
-		TemplateSource: *templateConfig,
-	}
-	probe.Run(&probes, app)
-	server.StartApp(app)
+	// Block until we receive our signal.
+	<-c
 
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, os.Interrupt)
-	<-ch
-
-	log.Println("Stopping probes...")
+	// Create a deadline to wait for.
+	ctx, cancel := context.WithTimeout(context.Background(), wait)
+	defer cancel()
+	// Doesn't block if no connections, but will otherwise wait
+	// until the timeout deadline.
+	_ = srv.Shutdown(ctx)
+	// Optionally, you could run srv.Shutdown in a goroutine and block on
+	// <-ctx.Done() if your application should wait for other services
+	// to finalize based on context cancellation.
+	log.Println("shutting down")
+	os.Exit(0)
 }

@@ -1,6 +1,6 @@
 # Madprobe
 
-This project has been made to provide company wanting simple aliveness probe to be easily installed on their systems.
+This project has been made to provide companies wanting simple aliveness probe to be easily installed on their systems.
 
 ## Getting Started
 
@@ -8,26 +8,54 @@ This project has been made to provide company wanting simple aliveness probe to 
 
 This project has be developed using `go version go1.13`
 
+It uses the well known `gorilla/mux` to serve our API.
+
 Golang can be installed from the official [go website](https://golang.org/dl/).
 
 ### Installing
 
-It's quite simple to start the app. A basic CLI made with the standard `flag` package was made to specify common
-options like the configuration file to create probes.
+It's quite simple to start the app. A basic CLI using with the standard `flag` package was made to specify common
+options like the port on which the server should listen.
 
 ```
-$ madprobe -yamlConfig /path/to/probes/config -port 6666 -templateConfig /path/to/golang/html/template
+$ ./madprobe -port 6666 -graceful-timeout 5
 ```
 
-If you don't specify any options, by default, the application will search for a configuration file located
-in `./configs/sample.yml` for the probe configuration, in `configs/index.gohtml` for the template configuration and
-will start a webserver on port `8081`
+If you don't specify any options, by default, the application will start a webserver on port `3000`
+and provide a graceful timeout of `15 seconds`.
 
 Each probe will run it's in own goroutine and will perform their checks independently.
 
-An example of probes configuration can be found [here](configs/sample.yml).
+### API
 
-To serve the same purpose, a Golang HTML template has been already written [here](configs/index.gohtml)
+The API is accessible through HTTP. It implements basic CRUD operations to manage the
+state of probes.
+
+For now, there is no probe persistence so stopping `madprobe` will result in losing all
+probes states.
+
+> :warning: **HTTP(s) is not supported yet**: Be very careful before exposing anything!
+
+Endpoints: 
+  - POST /api/v1/probe/create
+````   
+{
+    "Name": "simple-service-http",
+    "URL": "http://localhost:8080/actuator/health",
+    "Delay": 5
+}
+````
+  - GET /api/v1/probe/{name}
+  - GET /api/v1/probe
+  - PUT /api/v1/probe/{name}
+````   
+{
+    "Name": "simple-service-http",
+    "URL": "http://localhost:8080/actuator/health",
+    "Delay": 5
+}
+````
+  - DELETE /api/v1/probe/{name}
 
 ## Contributing
 
