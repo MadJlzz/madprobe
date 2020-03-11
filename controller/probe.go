@@ -17,12 +17,21 @@ type ProbeService interface {
 	Create(probe service.Probe) error
 	Read(name string) (*service.Probe, error)
 	ReadAll() []service.Probe
+	Update(name string, probe service.Probe) error
 	Delete(name string) error
 }
 
 // CreateProbeRequest represents the data structure
 // decoded from incoming HTTP request when trying to create a new probe.
 type CreateProbeRequest struct {
+	Name  string
+	URL   string
+	Delay uint
+}
+
+// UpdateProbeRequest represents the data structure
+// decoded from incoming HTTP request when trying to update an existing probe.
+type UpdateProbeRequest struct {
 	Name  string
 	URL   string
 	Delay uint
@@ -152,6 +161,44 @@ func (pc *ProbeController) ReadAll(w http.ResponseWriter, req *http.Request) {
 		}
 		return
 	}
+}
+
+// Update allows consumer to update an existing probe in the system.
+// It will return a HTTP 200 status code if it succeeds, a human readable error otherwise.
+//
+// PUT /api/v1/probe/{name}
+func (pc *ProbeController) Update(w http.ResponseWriter, req *http.Request) {
+	var upr UpdateProbeRequest
+	vars := mux.Vars(req)
+
+	err := decodeJSONBody(w, req, &upr)
+	if err != nil {
+		var mr *malformedContent
+		if errors.As(err, &mr) {
+			http.Error(w, mr.msg, mr.status)
+		} else {
+			log.Println(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	err = pc.ProbeService.Update(vars["name"], service.Probe{
+		Name:  upr.Name,
+		URL:   upr.URL,
+		Delay: upr.Delay,
+	})
+	if err != nil {
+		switch err {
+		case service.ErrProbeAlreadyExist:
+			http.Error(w, err.Error(), http.StatusConflict)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	_, _ = fmt.Fprintf(w, "Probe [%s] has been updated.", upr.Name)
 }
 
 // Delete allows consumer to delete an existing probe in the system.

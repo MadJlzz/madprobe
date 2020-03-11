@@ -86,6 +86,32 @@ func (ps *ProbeService) ReadAll() []Probe {
 	return probes
 }
 
+// Update is a bit more complicated.
+// Technically, it deletes the running probe and creates a new one with the given values.
+func (ps *ProbeService) Update(name string, probe Probe) error {
+	err := runValidators(probe, nameInvalid, urlInvalid, delayInvalid)
+	if err != nil {
+		return err
+	}
+	if _, ok := ps.probes[name]; !ok {
+		return ErrProbeNotFound
+	}
+	if _, ok := ps.probes[probe.Name]; name != probe.Name && ok {
+		return ErrProbeAlreadyExist
+	}
+
+	ps.probes[name].finish <- true
+	delete(ps.probes, name)
+
+	probe.finish = make(chan bool, 1)
+	ps.probes[probe.Name] = probe
+
+	go run(probe)
+
+	log.Printf("Probe [%s] has been successfuly updated.\n", probe.Name)
+	return nil
+}
+
 // Delete erase an existing probe from the system.
 // Validation is made before deletion to be sure nothing get removed by error.
 func (ps *ProbeService) Delete(name string) error {
