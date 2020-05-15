@@ -14,25 +14,43 @@ Golang can be installed from the official [go website](https://golang.org/dl/).
 
 ### Installing
 
-It's quite simple to start the app. A basic CLI using with the standard `flag` package was made to specify common
-options like the port on which the server should listen.
+It's quite simple to start the app. A basic CLI using the `pflag` package to specify common
+options like the port on which the server should listen. `viper` is used to manage configuration context.
 
-```
-$ ./madprobe -port 6666 -graceful-timeout 5
+```shell script
+./madprobe --port 6666 --graceful-timeout 5
 ```
 
-If you don't specify any options, by default, the application will start a HTTP webserver on port `3000`
+If you don't specify any options, by default, the application will start an HTTP webserver on port `3000`
 and provide a graceful timeout of `15 seconds`.
 
 If you want to run the server in HTTPs, you need to pass more arguments to the command line:
-```
-$ ./madprobe -cert configs/certs/public.pem -key configs/certs/key.pem
+```shell script
+./madprobe --cert configs/certs/public.pem --key configs/certs/key.pem
 ```
 
-Do not forget to set the `-ca-cert` flag if you desire your probes to do HTTPS requests.
+Do not forget to set the `--ca-cert` flag if you desire your probes to do HTTPS requests.
+```shell script
+./madprobe --cert configs/certs/public.pem --key configs/certs/key.pem --ca-cert configs/certs/cacert.pem
 ```
-$ ./madprobe -cert configs/certs/public.pem -key configs/certs/key.pem -ca-cert configs/certs/cacert.pem
+
+Also, be aware you can configure `madprobe` using a `yaml configuration` file. Here's an example:
+```yaml
+port: 3000
+cert: configs/certs/public.pem
+key: configs/certs/key.pem
+ca-cert: configs/certs/cacert.pem
 ```
+
+Environment variables are a way to configure `madprobe` too!
+```shell script
+export PORT=3000
+export CERT=configs/certs/public.pem
+export KEY=configs/certs/key.pem
+export CA-CERT=configs/certs/cacert.pem
+```
+
+> :warning: **Pay attention to the override direction**: defaults, config file, env. variables, flags
 
 If you want to generate basic certificates, please look in the configs/certs directory.
 `gencert.sh` is based on `cfssl` and `cfssljson` which are easier to use than `openssl`.
@@ -75,4 +93,4 @@ I m eager to learn what could be improved!
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
+This project license is the MIT License - see the [LICENSE](LICENSE) file for details

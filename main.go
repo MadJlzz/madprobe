@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"github.com/gorilla/mux"
 	"github.com/madjlzz/madprobe/controller"
 	"github.com/madjlzz/madprobe/internal"
@@ -14,24 +13,14 @@ import (
 	"time"
 )
 
-var (
-	wait = flag.Duration("graceful-timeout", time.Second*15, "the duration for which the server gracefully wait for existing connections to finish - e.g. 15s or 1m")
-	port = flag.String("port", "3000", "the port for which the server will start to listen to")
-
-	serverCertificate = flag.String("cert", "", "public certificate shown by the server to it's clients")
-	serverKey         = flag.String("key", "", "the server's certificate private key")
-	caCertificate     = flag.String("ca-cert", "", "the CA certificate")
-)
-
 func main() {
-	flag.Parse()
+	configuration := internal.NewServerConfiguration()
 
-	var client *http.Client
-	if *caCertificate == "" {
-		client = http.DefaultClient
-	} else {
-		client = internal.HttpsClient(*caCertificate)
+	client := http.DefaultClient
+	if len(configuration.CaCertificate) > 0 {
+		client = internal.HttpsClient(configuration.CaCertificate)
 	}
+
 	probeService := service.NewProbeService(client)
 	probeController := controller.NewProbeController(probeService)
 
@@ -48,7 +37,7 @@ func main() {
 		Methods(http.MethodDelete)
 
 	srv := &http.Server{
-		Addr: "0.0.0.0:" + *port,
+		Addr: "0.0.0.0:" + configuration.Port,
 		// Good practice to set timeouts to avoid Slowloris attacks.
 		WriteTimeout: time.Second * 15,
 		ReadTimeout:  time.Second * 15,
@@ -58,14 +47,14 @@ func main() {
 
 	// Run our server in a goroutine so that it doesn't block.
 	go func() {
-		if *serverCertificate == "" || *serverKey == "" {
-			log.Printf("Starting HTTP server on port %s...\n", *port)
+		if len(configuration.ServerCertificate) == 0 || len(configuration.ServerKey) == 0 {
+			log.Printf("Starting HTTP server on port %s...\n", configuration.Port)
 			if err := srv.ListenAndServe(); err != nil {
 				log.Println(err)
 			}
 		} else {
-			log.Printf("Starting HTTPs server on port %s...\n", *port)
-			if err := srv.ListenAndServeTLS(*serverCertificate, *serverKey); err != nil {
+			log.Printf("Starting HTTPs server on port %s...\n", configuration.Port)
+			if err := srv.ListenAndServeTLS(configuration.ServerCertificate, configuration.ServerKey); err != nil {
 				log.Println(err)
 			}
 		}
@@ -80,7 +69,7 @@ func main() {
 	<-c
 
 	// Create a deadline to wait for.
-	ctx, cancel := context.WithTimeout(context.Background(), *wait)
+	ctx, cancel := context.WithTimeout(context.Background(), configuration.Wait)
 	defer cancel()
 	// Doesn't block if no connections, but will otherwise wait
 	// until the timeout deadline.
