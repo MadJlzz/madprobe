@@ -15,7 +15,7 @@ jobs:
     - name: Build the Docker image
       run: docker build . --file Dockerfile --tag madjlzz/madprobe:${GITHUB_SHA::8}
     - name: Login to DockerHub
-      run: printf $DOCKER_PASSWORD | docker login --username $DOCKER_USERNAME --password-stdin
+      run: echo -n $DOCKER_PASSWORD | docker login --username $DOCKER_USERNAME --password-stdin
       env:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
