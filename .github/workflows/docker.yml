@@ -12,9 +12,14 @@ jobs:
     steps:
     - name: Checkout madprobe
       uses: actions/checkout@v2        
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag madjlzz/madprobe:${GITHUB_SHA::8}
-    - name: Login to DockerHub
-      run: echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-    - name: Publish the Docker image
-      run: docker push registry-host:5000/myadmin/rhel-httpd
+    - name: Build and push Docker images
+      uses: docker/build-push-action@v1.1.0
+      with:
+        # Username used to log in to a Docker registry. If not set then no login will occur
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        # Password or personal access token used to log in to a Docker registry. If not set then no login will occur
+        password: ${{ secrets.DOCKERHUB_PASSWORD }}
+        # Docker repository to tag the image with
+        repository: madjlzz/madprobe
+        # Automatically tags the built image with the git short SHA as per the readme
+        tag_with_sha: true
