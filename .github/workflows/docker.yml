@@ -16,9 +16,9 @@ jobs:
       uses: docker/build-push-action@v1.1.0
       with:
         # Username used to log in to a Docker registry. If not set then no login will occur
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        username: ${{ secrets.DOCKER_USERNAME }}
         # Password or personal access token used to log in to a Docker registry. If not set then no login will occur
-        password: ${{ secrets.DOCKERHUB_PASSWORD }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
         # Docker repository to tag the image with
         repository: madjlzz/madprobe
         # Automatically tags the built image with the git short SHA as per the readme
