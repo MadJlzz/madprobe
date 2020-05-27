@@ -27,6 +27,7 @@ var instance *ProbeService
 type Probe struct {
 	Name   string
 	URL    string
+	Status string
 	Delay  uint
 	finish chan bool
 }
@@ -35,7 +36,7 @@ type Probe struct {
 // of the interface controller.ProbeService
 type ProbeService struct {
 	client *http.Client
-	probes map[string]Probe
+	probes map[string]*Probe
 }
 
 // NewProbeService allow to create a new ProbeService
@@ -44,7 +45,7 @@ func NewProbeService(client *http.Client) *ProbeService {
 	once.Do(func() {
 		instance = &ProbeService{
 			client: client,
-			probes: make(map[string]Probe),
+			probes: make(map[string]*Probe),
 		}
 	})
 	return instance
@@ -62,9 +63,9 @@ func (ps *ProbeService) Create(probe Probe) error {
 	}
 
 	probe.finish = make(chan bool, 1)
-	ps.probes[probe.Name] = probe
+	ps.probes[probe.Name] = &probe
 
-	go ps.run(probe)
+	go ps.run(ps.probes[probe.Name])
 
 	log.Printf("Probe [%s] has been successfuly created.\n", probe.Name)
 	return nil
@@ -77,12 +78,12 @@ func (ps *ProbeService) Read(name string) (*Probe, error) {
 	if !ok {
 		return nil, ErrProbeNotFound
 	}
-	return &probe, nil
+	return probe, nil
 }
 
 // ReadAll retrieve all probes in the system.
-func (ps *ProbeService) ReadAll() []Probe {
-	var probes []Probe
+func (ps *ProbeService) ReadAll() []*Probe {
+	var probes []*Probe
 	for _, value := range ps.probes {
 		probes = append(probes, value)
 	}
@@ -107,9 +108,9 @@ func (ps *ProbeService) Update(name string, probe Probe) error {
 	delete(ps.probes, name)
 
 	probe.finish = make(chan bool, 1)
-	ps.probes[probe.Name] = probe
+	ps.probes[probe.Name] = &probe
 
-	go ps.run(probe)
+	go ps.run(ps.probes[probe.Name])
 
 	log.Printf("Probe [%s] has been successfuly updated.\n", probe.Name)
 	return nil
@@ -124,19 +125,19 @@ func (ps *ProbeService) Delete(name string) error {
 		return err
 	}
 
-	probe, ok := ps.probes[name]
+	mapProbe, ok := ps.probes[name]
 	if !ok {
 		return ErrProbeNotFound
 	}
 
-	probe.finish <- true
-	delete(ps.probes, probe.Name)
+	mapProbe.finish <- true
+	delete(ps.probes, mapProbe.Name)
 
 	return nil
 }
 
 // run launch probes in a separate goroutine.
-func (ps *ProbeService) run(probe Probe) {
+func (ps *ProbeService) run(probe *Probe) {
 	for {
 		select {
 		case <-probe.finish:
@@ -145,11 +146,14 @@ func (ps *ProbeService) run(probe Probe) {
 		default:
 			resp, err := ps.client.Get(probe.URL)
 			if err != nil {
+				probe.Status = "DOWN"
 				log.Printf("<<HTTP(s) PROBE [%s]>> Service targeting [%s] is down.\n", probe.Name, probe.URL)
 			} else if resp.StatusCode != 200 {
 				b, _ := ioutil.ReadAll(resp.Body)
+				probe.Status = "DOWN"
 				log.Printf("<<HTTP(s) PROBE [%s]>> Service targeting [%s] returned an error. got: ['%v']\n", probe.Name, probe.URL, string(b))
 			} else {
+				probe.Status = "UP"
 				log.Printf("<<HTTP(s) PROBE [%s]>> Service targeting [%s] is alive.\n", probe.Name, probe.URL)
 				_ = resp.Body.Close()
 			}
