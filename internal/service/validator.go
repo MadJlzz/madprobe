@@ -3,6 +3,8 @@ package service
 import (
 	"fmt"
 	"net/url"
+
+	"github.com/madjlzz/madprobe/internal/model"
 )
 
 type validatorError struct {
@@ -14,9 +16,9 @@ func (ve *validatorError) Error() string {
 	return fmt.Sprintf("Field [%s]: %s\n", ve.field, ve.msg)
 }
 
-type validateFunc func(probe Probe) error
+type validateFunc func(probe model.Probe) error
 
-func nameInvalid(probe Probe) error {
+func nameInvalid(probe model.Probe) error {
 	if probe.Name == "" {
 		return &validatorError{
 			field: "Name",
@@ -26,7 +28,7 @@ func nameInvalid(probe Probe) error {
 	return nil
 }
 
-func urlInvalid(probe Probe) error {
+func urlInvalid(probe model.Probe) error {
 	if probe.URL == "" {
 		return &validatorError{
 			field: "URL",
@@ -50,7 +52,7 @@ func urlInvalid(probe Probe) error {
 	return nil
 }
 
-func delayInvalid(probe Probe) error {
+func delayInvalid(probe model.Probe) error {
 	if probe.Delay <= 0 {
 		return &validatorError{
 			field: "Delay",
@@ -60,7 +62,7 @@ func delayInvalid(probe Probe) error {
 	return nil
 }
 
-func runValidators(probe Probe, fns ...validateFunc) error {
+func runValidators(probe model.Probe, fns ...validateFunc) error {
 	for _, fn := range fns {
 		if err := fn(probe); err != nil {
 			return err

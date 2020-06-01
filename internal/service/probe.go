@@ -4,11 +4,15 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/madjlzz/madprobe/internal/database"
+	"github.com/madjlzz/madprobe/internal/model"
 )
 
 var (
@@ -22,20 +26,11 @@ var once sync.Once
 
 var instance *ProbeService
 
-// Probe is the model required by the service to manipulate
-// the resource.
-type Probe struct {
-	Name   string
-	URL    string
-	Delay  uint
-	finish chan bool
-}
-
 // ProbeService is an implementation
 // of the interface controller.ProbeService
 type ProbeService struct {
 	client *http.Client
-	probes map[string]Probe
+	probes map[string]model.Probe
 }
 
 // NewProbeService allow to create a new ProbeService
@@ -44,15 +39,16 @@ func NewProbeService(client *http.Client) *ProbeService {
 	once.Do(func() {
 		instance = &ProbeService{
 			client: client,
-			probes: make(map[string]Probe),
+			probes: make(map[string]model.Probe),
 		}
+		instance.initWithStoredProbes()
 	})
 	return instance
 }
 
 // Create does nothing but registering the given probe.
 // Validation is made before storing the probe to be sure nothing partially configured enters the system.
-func (ps *ProbeService) Create(probe Probe) error {
+func (ps *ProbeService) Create(probe model.Probe) error {
 	err := runValidators(probe, nameInvalid, urlInvalid, delayInvalid)
 	if err != nil {
 		return err
@@ -61,8 +57,10 @@ func (ps *ProbeService) Create(probe Probe) error {
 		return ErrProbeAlreadyExist
 	}
 
-	probe.finish = make(chan bool, 1)
-	ps.probes[probe.Name] = probe
+	err = ps.insertProbe(probe)
+	if err != nil {
+		return err
+	}
 
 	go ps.run(probe)
 
@@ -72,7 +70,7 @@ func (ps *ProbeService) Create(probe Probe) error {
 
 // Read retrieve a probe with the given name in the system.
 // No validation is required. Returns the probe or ErrProbeNotFound is not probe has been found.
-func (ps *ProbeService) Read(name string) (*Probe, error) {
+func (ps *ProbeService) Read(name string) (*model.Probe, error) {
 	probe, ok := ps.probes[name]
 	if !ok {
 		return nil, ErrProbeNotFound
@@ -81,8 +79,8 @@ func (ps *ProbeService) Read(name string) (*Probe, error) {
 }
 
 // ReadAll retrieve all probes in the system.
-func (ps *ProbeService) ReadAll() []Probe {
-	var probes []Probe
+func (ps *ProbeService) ReadAll() []model.Probe {
+	var probes []model.Probe
 	for _, value := range ps.probes {
 		probes = append(probes, value)
 	}
@@ -91,7 +89,7 @@ func (ps *ProbeService) ReadAll() []Probe {
 
 // Update is a bit more complicated.
 // Technically, it deletes the running probe and creates a new one with the given values.
-func (ps *ProbeService) Update(name string, probe Probe) error {
+func (ps *ProbeService) Update(name string, probe model.Probe) error {
 	err := runValidators(probe, nameInvalid, urlInvalid, delayInvalid)
 	if err != nil {
 		return err
@@ -103,12 +101,14 @@ func (ps *ProbeService) Update(name string, probe Probe) error {
 		return ErrProbeAlreadyExist
 	}
 
-	ps.probes[name].finish <- true
-	delete(ps.probes, name)
-
-	probe.finish = make(chan bool, 1)
-	ps.probes[probe.Name] = probe
-
+	err = ps.deleteProbe(ps.probes[name])
+	if err != nil {
+		return err
+	}
+	err = ps.insertProbe(probe)
+	if err != nil {
+		return err
+	}
 	go ps.run(probe)
 
 	log.Printf("Probe [%s] has been successfuly updated.\n", probe.Name)
@@ -118,7 +118,7 @@ func (ps *ProbeService) Update(name string, probe Probe) error {
 // Delete erase an existing probe from the system.
 // Validation is made before deletion to be sure nothing get removed by error.
 func (ps *ProbeService) Delete(name string) error {
-	probe := Probe{Name: name}
+	probe := model.Probe{Name: name}
 	err := runValidators(probe, nameInvalid)
 	if err != nil {
 		return err
@@ -129,17 +129,58 @@ func (ps *ProbeService) Delete(name string) error {
 		return ErrProbeNotFound
 	}
 
-	probe.finish <- true
-	delete(ps.probes, probe.Name)
+	return ps.deleteProbe(probe)
+}
 
+func (ps *ProbeService) insertProbe(probe model.Probe) error {
+	dbClient, err := database.GetClient()
+	if err != nil {
+		return err
+	}
+	_, err = dbClient.InsertProbe(probe, func(probe model.Probe) error {
+		probe.Finish = make(chan bool, 1)
+		ps.probes[probe.Name] = probe
+		return nil
+	})
+	return err
+}
+
+func (ps *ProbeService) deleteProbe(probe model.Probe) error {
+	dbClient, err := database.GetClient()
+	if err != nil {
+		return err
+	}
+	err = dbClient.DeleteProbeByID(probe.ID, func() error {
+		fmt.Println("in delete probe cb")
+		probe.Finish <- true
+		delete(ps.probes, probe.Name)
+		return nil
+	})
+	return err
+}
+
+func (ps *ProbeService) initWithStoredProbes() error {
+	dbClient, err := database.GetClient()
+	if err != nil {
+		return err
+	}
+	probes, err := dbClient.ReadAllProbes()
+	if err != nil {
+		return err
+	}
+	for _, probe := range probes {
+		probe.Finish = make(chan bool, 1)
+		ps.probes[probe.Name] = probe
+		go ps.run(probe)
+	}
 	return nil
 }
 
 // run launch probes in a separate goroutine.
-func (ps *ProbeService) run(probe Probe) {
+func (ps *ProbeService) run(probe model.Probe) {
 	for {
 		select {
-		case <-probe.finish:
+		case <-probe.Finish:
 			log.Printf("<<HTTP PROBE [%s]>> Stopping probe...\n", probe.Name)
 			return
 		default:

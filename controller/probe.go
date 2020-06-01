@@ -5,19 +5,21 @@ package controller
 import (
 	"errors"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/madjlzz/madprobe/internal/service"
 	"log"
 	"net/http"
+
+	"github.com/gorilla/mux"
+	"github.com/madjlzz/madprobe/internal/model"
+	"github.com/madjlzz/madprobe/internal/service"
 )
 
 // ProbeService represent the interface used
 // to manipulate probes.
 type ProbeService interface {
-	Create(probe service.Probe) error
-	Read(name string) (*service.Probe, error)
-	ReadAll() []service.Probe
-	Update(name string, probe service.Probe) error
+	Create(probe model.Probe) error
+	Read(name string) (*model.Probe, error)
+	ReadAll() []model.Probe
+	Update(name string, probe model.Probe) error
 	Delete(name string) error
 }
 
@@ -79,7 +81,7 @@ func (pc *ProbeController) Create(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	err = pc.ProbeService.Create(service.Probe{
+	err = pc.ProbeService.Create(model.Probe{
 		Name:  cpr.Name,
 		URL:   cpr.URL,
 		Delay: cpr.Delay,
@@ -183,7 +185,7 @@ func (pc *ProbeController) Update(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	err = pc.ProbeService.Update(vars["name"], service.Probe{
+	err = pc.ProbeService.Update(vars["name"], model.Probe{
 		Name:  upr.Name,
 		URL:   upr.URL,
 		Delay: upr.Delay,
