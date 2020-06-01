@@ -4,7 +4,6 @@ package service
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -30,7 +29,7 @@ var instance *ProbeService
 // of the interface controller.ProbeService
 type ProbeService struct {
 	client *http.Client
-	probes map[string]model.Probe
+	probes map[string]*model.Probe
 }
 
 // NewProbeService allow to create a new ProbeService
@@ -39,7 +38,7 @@ func NewProbeService(client *http.Client) *ProbeService {
 	once.Do(func() {
 		instance = &ProbeService{
 			client: client,
-			probes: make(map[string]model.Probe),
+			probes: make(map[string]*model.Probe),
 		}
 		instance.initWithStoredProbes()
 	})
@@ -62,7 +61,7 @@ func (ps *ProbeService) Create(probe model.Probe) error {
 		return err
 	}
 
-	go ps.run(probe)
+	go ps.run(ps.probes[probe.Name])
 
 	log.Printf("Probe [%s] has been successfuly created.\n", probe.Name)
 	return nil
@@ -75,12 +74,12 @@ func (ps *ProbeService) Read(name string) (*model.Probe, error) {
 	if !ok {
 		return nil, ErrProbeNotFound
 	}
-	return &probe, nil
+	return probe, nil
 }
 
 // ReadAll retrieve all probes in the system.
-func (ps *ProbeService) ReadAll() []model.Probe {
-	var probes []model.Probe
+func (ps *ProbeService) ReadAll() []*model.Probe {
+	var probes []*model.Probe
 	for _, value := range ps.probes {
 		probes = append(probes, value)
 	}
@@ -101,7 +100,7 @@ func (ps *ProbeService) Update(name string, probe model.Probe) error {
 		return ErrProbeAlreadyExist
 	}
 
-	err = ps.deleteProbe(ps.probes[name])
+	err = ps.deleteProbe(*ps.probes[name])
 	if err != nil {
 		return err
 	}
@@ -109,7 +108,7 @@ func (ps *ProbeService) Update(name string, probe model.Probe) error {
 	if err != nil {
 		return err
 	}
-	go ps.run(probe)
+	go ps.run(&probe)
 
 	log.Printf("Probe [%s] has been successfuly updated.\n", probe.Name)
 	return nil
@@ -124,12 +123,12 @@ func (ps *ProbeService) Delete(name string) error {
 		return err
 	}
 
-	probe, ok := ps.probes[name]
+	mapProbe, ok := ps.probes[name]
 	if !ok {
 		return ErrProbeNotFound
 	}
 
-	return ps.deleteProbe(probe)
+	return ps.deleteProbe(*mapProbe)
 }
 
 func (ps *ProbeService) insertProbe(probe model.Probe) error {
@@ -139,7 +138,7 @@ func (ps *ProbeService) insertProbe(probe model.Probe) error {
 	}
 	_, err = dbClient.InsertProbe(probe, func(probe model.Probe) error {
 		probe.Finish = make(chan bool, 1)
-		ps.probes[probe.Name] = probe
+		ps.probes[probe.Name] = &probe
 		return nil
 	})
 	return err
@@ -151,7 +150,6 @@ func (ps *ProbeService) deleteProbe(probe model.Probe) error {
 		return err
 	}
 	err = dbClient.DeleteProbeByID(probe.ID, func() error {
-		fmt.Println("in delete probe cb")
 		probe.Finish <- true
 		delete(ps.probes, probe.Name)
 		return nil
@@ -169,15 +167,16 @@ func (ps *ProbeService) initWithStoredProbes() error {
 		return err
 	}
 	for _, probe := range probes {
-		probe.Finish = make(chan bool, 1)
-		ps.probes[probe.Name] = probe
-		go ps.run(probe)
+		copy := probe.Copy()
+		copy.Finish = make(chan bool, 1)
+		ps.probes[copy.Name] = &copy
+		go ps.run(&copy)
 	}
 	return nil
 }
 
 // run launch probes in a separate goroutine.
-func (ps *ProbeService) run(probe model.Probe) {
+func (ps *ProbeService) run(probe *model.Probe) {
 	for {
 		select {
 		case <-probe.Finish:
@@ -186,11 +185,14 @@ func (ps *ProbeService) run(probe model.Probe) {
 		default:
 			resp, err := ps.client.Get(probe.URL)
 			if err != nil {
+				probe.Status = "DOWN"
 				log.Printf("<<HTTP(s) PROBE [%s]>> Service targeting [%s] is down.\n", probe.Name, probe.URL)
 			} else if resp.StatusCode != 200 {
 				b, _ := ioutil.ReadAll(resp.Body)
+				probe.Status = "DOWN"
 				log.Printf("<<HTTP(s) PROBE [%s]>> Service targeting [%s] returned an error. got: ['%v']\n", probe.Name, probe.URL, string(b))
 			} else {
+				probe.Status = "UP"
 				log.Printf("<<HTTP(s) PROBE [%s]>> Service targeting [%s] is alive.\n", probe.Name, probe.URL)
 				_ = resp.Body.Close()
 			}

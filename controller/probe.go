@@ -18,7 +18,7 @@ import (
 type ProbeService interface {
 	Create(probe model.Probe) error
 	Read(name string) (*model.Probe, error)
-	ReadAll() []model.Probe
+	ReadAll() []*model.Probe
 	Update(name string, probe model.Probe) error
 	Delete(name string) error
 }
@@ -43,9 +43,10 @@ type UpdateProbeRequest struct {
 // send to clients when they are trying to fetch information from the API.
 // It is encoded in JSON.
 type ProbeResponse struct {
-	Name  string
-	URL   string
-	Delay uint
+	Name   string
+	URL    string
+	Status string
+	Delay  uint
 }
 
 // ProbeController is the controller
@@ -119,9 +120,10 @@ func (pc *ProbeController) Read(w http.ResponseWriter, req *http.Request) {
 
 	// Encode the probe in json and send it over to the client
 	pr := ProbeResponse{
-		Name:  probe.Name,
-		URL:   probe.URL,
-		Delay: probe.Delay,
+		Name:   probe.Name,
+		URL:    probe.URL,
+		Status: probe.Status,
+		Delay:  probe.Delay,
 	}
 	err = encodeJSONBody(w, &pr)
 	if err != nil {
@@ -146,9 +148,10 @@ func (pc *ProbeController) ReadAll(w http.ResponseWriter, req *http.Request) {
 	pr := make([]ProbeResponse, 0)
 	for _, value := range probes {
 		pr = append(pr, ProbeResponse{
-			Name:  value.Name,
-			URL:   value.URL,
-			Delay: value.Delay,
+			Name:   value.Name,
+			URL:    value.URL,
+			Status: value.Status,
+			Delay:  value.Delay,
 		})
 	}
 
