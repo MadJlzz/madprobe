@@ -1,4 +1,5 @@
 # Madprobe
+[![Go report](https://goreportcard.com/badge/github.com/MadJlzz/madprobe)](https://goreportcard.com/report/github.com/MadJlzz/madprobe)
 
 This project has been made to provide companies wanting simple aliveness probe to be easily installed on their systems.
 
