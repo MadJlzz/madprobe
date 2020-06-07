@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/madjlzz/madprobe/internal/database"
 	"github.com/madjlzz/madprobe/internal/model"
+	"github.com/madjlzz/madprobe/internal/persistence"
 )
 
 var (
@@ -28,21 +28,27 @@ var instance *ProbeService
 // ProbeService is an implementation
 // of the interface controller.ProbeService
 type ProbeService struct {
-	client *http.Client
-	probes map[string]*model.Probe
+	client            *http.Client
+	persistenceClient *persistence.PersistenceClient
 }
 
 // NewProbeService allow to create a new ProbeService
 // implemented as a singleton.
-func NewProbeService(client *http.Client) *ProbeService {
+func NewProbeService(client *http.Client) (*ProbeService, error) {
+	var err error
 	once.Do(func() {
-		instance = &ProbeService{
-			client: client,
-			probes: make(map[string]*model.Probe),
+		persistenceClient, err2 := persistence.NewPersistenceClient()
+		if err != nil {
+			err = err2
+			return
 		}
-		instance.initWithStoredProbes()
+		instance = &ProbeService{
+			client:            client,
+			persistenceClient: persistenceClient,
+		}
+		instance.runAllProbes()
 	})
-	return instance
+	return instance, err
 }
 
 // Create does nothing but registering the given probe.
@@ -52,16 +58,17 @@ func (ps *ProbeService) Create(probe model.Probe) error {
 	if err != nil {
 		return err
 	}
-	if _, ok := ps.probes[probe.Name]; ok {
+
+	if ps.persistenceClient.ExistProbeByName(probe.Name) {
 		return ErrProbeAlreadyExist
 	}
 
-	err = ps.insertProbe(probe)
+	ps.persistenceClient.InsertProbe(&probe)
 	if err != nil {
 		return err
 	}
 
-	go ps.run(ps.probes[probe.Name])
+	go ps.run(&probe)
 
 	log.Printf("Probe [%s] has been successfuly created.\n", probe.Name)
 	return nil
@@ -70,7 +77,7 @@ func (ps *ProbeService) Create(probe model.Probe) error {
 // Read retrieve a probe with the given name in the system.
 // No validation is required. Returns the probe or ErrProbeNotFound is not probe has been found.
 func (ps *ProbeService) Read(name string) (*model.Probe, error) {
-	probe, ok := ps.probes[name]
+	probe, ok := ps.persistenceClient.GetProbe(name)
 	if !ok {
 		return nil, ErrProbeNotFound
 	}
@@ -79,11 +86,7 @@ func (ps *ProbeService) Read(name string) (*model.Probe, error) {
 
 // ReadAll retrieve all probes in the system.
 func (ps *ProbeService) ReadAll() []*model.Probe {
-	var probes []*model.Probe
-	for _, value := range ps.probes {
-		probes = append(probes, value)
-	}
-	return probes
+	return ps.persistenceClient.GetAllProbe()
 }
 
 // Update is a bit more complicated.
@@ -93,18 +96,18 @@ func (ps *ProbeService) Update(name string, probe model.Probe) error {
 	if err != nil {
 		return err
 	}
-	if _, ok := ps.probes[name]; !ok {
+	if !ps.persistenceClient.ExistProbeByName(name) {
 		return ErrProbeNotFound
 	}
-	if _, ok := ps.probes[probe.Name]; name != probe.Name && ok {
+	if ps.persistenceClient.ExistProbeByName(probe.Name) && name != probe.Name {
 		return ErrProbeAlreadyExist
 	}
 
-	err = ps.deleteProbe(*ps.probes[name])
+	err = ps.persistenceClient.DeleteProbeByName(name)
 	if err != nil {
 		return err
 	}
-	err = ps.insertProbe(probe)
+	ps.persistenceClient.InsertProbe(&probe)
 	if err != nil {
 		return err
 	}
@@ -123,56 +126,18 @@ func (ps *ProbeService) Delete(name string) error {
 		return err
 	}
 
-	mapProbe, ok := ps.probes[name]
-	if !ok {
+	if !ps.persistenceClient.ExistProbeByName(name) {
 		return ErrProbeNotFound
 	}
 
-	return ps.deleteProbe(*mapProbe)
+	return ps.persistenceClient.DeleteProbeByName(name)
 }
 
-func (ps *ProbeService) insertProbe(probe model.Probe) error {
-	dbClient, err := database.GetClient()
-	if err != nil {
-		return err
-	}
-	_, err = dbClient.InsertProbe(probe, func(probe model.Probe) error {
-		probe.Finish = make(chan bool, 1)
-		ps.probes[probe.Name] = &probe
-		return nil
-	})
-	return err
-}
-
-func (ps *ProbeService) deleteProbe(probe model.Probe) error {
-	dbClient, err := database.GetClient()
-	if err != nil {
-		return err
-	}
-	err = dbClient.DeleteProbeByID(probe.ID, func() error {
-		probe.Finish <- true
-		delete(ps.probes, probe.Name)
-		return nil
-	})
-	return err
-}
-
-func (ps *ProbeService) initWithStoredProbes() error {
-	dbClient, err := database.GetClient()
-	if err != nil {
-		return err
-	}
-	probes, err := dbClient.ReadAllProbes()
-	if err != nil {
-		return err
-	}
+func (ps *ProbeService) runAllProbes() {
+	probes := ps.persistenceClient.GetAllProbe()
 	for _, probe := range probes {
-		copy := probe.Copy()
-		copy.Finish = make(chan bool, 1)
-		ps.probes[copy.Name] = &copy
-		go ps.run(&copy)
+		go ps.run(probe)
 	}
-	return nil
 }
 
 // run launch probes in a separate goroutine.

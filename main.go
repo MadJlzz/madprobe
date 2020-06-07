@@ -2,15 +2,16 @@ package main
 
 import (
 	"context"
-	"github.com/gorilla/mux"
-	"github.com/madjlzz/madprobe/controller"
-	"github.com/madjlzz/madprobe/internal"
-	"github.com/madjlzz/madprobe/internal/service"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/madjlzz/madprobe/controller"
+	"github.com/madjlzz/madprobe/internal"
+	"github.com/madjlzz/madprobe/internal/service"
 )
 
 func main() {
@@ -21,7 +22,10 @@ func main() {
 		client = internal.HttpsClient(configuration.CaCertificate)
 	}
 
-	probeService := service.NewProbeService(client)
+	probeService, err := service.NewProbeService(client)
+	if err != nil {
+		log.Fatalln("Failed to create probe service", err)
+	}
 	probeController := controller.NewProbeController(probeService)
 
 	r := mux.NewRouter()

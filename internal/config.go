@@ -1,10 +1,11 @@
 package internal
 
 import (
-	flag "github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"log"
 	"time"
+
+	flag "github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -13,6 +14,7 @@ const (
 	defaultServerCertificate = ""
 	defaultServerKey         = ""
 	defaultCaCertificate     = ""
+	defaultDatabaseFile      = "madprobe.db"
 )
 
 type ServerConfiguration struct {
@@ -26,6 +28,8 @@ type ServerConfiguration struct {
 	ServerKey string
 	// the CA certificate
 	CaCertificate string
+	// the file used by the database that stores probes
+	DatabaseFile string
 }
 
 func NewServerConfiguration() ServerConfiguration {
@@ -38,6 +42,7 @@ func NewServerConfiguration() ServerConfiguration {
 		ServerCertificate: getServerCertificate(),
 		ServerKey:         getServerKey(),
 		CaCertificate:     getCaCertificate(),
+		DatabaseFile:      GetDatabaseFile(),
 	}
 }
 
@@ -60,6 +65,7 @@ func initFlags() {
 	flag.String("cert", defaultServerCertificate, "public certificate shown by the server to it's clients")
 	flag.String("key", defaultServerKey, "the server's certificate private key")
 	flag.String("ca-cert", defaultCaCertificate, "the CA certificate")
+	flag.String("db-file", defaultDatabaseFile, "the database file")
 	flag.Parse()
 	if err := viper.BindPFlags(flag.CommandLine); err != nil {
 		log.Printf("[WARNING] %v\n", err)
@@ -104,4 +110,12 @@ func getCaCertificate() string {
 		caCert = viper.GetString("ca-cert")
 	}
 	return caCert
+}
+
+func GetDatabaseFile() string {
+	databaseFile := defaultDatabaseFile
+	if viper.IsSet("db-file") {
+		databaseFile = viper.GetString("db-file")
+	}
+	return databaseFile
 }
