@@ -35,17 +35,19 @@ type Probe struct {
 // ProbeService is an implementation
 // of the interface controller.ProbeService
 type ProbeService struct {
-	client *http.Client
-	probes map[string]*Probe
+	client   *http.Client
+	probes   map[string]*Probe
+	eventBus chan<- Probe
 }
 
 // NewProbeService allow to create a new ProbeService
 // implemented as a singleton.
-func NewProbeService(client *http.Client) *ProbeService {
+func NewProbeService(client *http.Client, eventBus chan<- Probe) *ProbeService {
 	once.Do(func() {
 		instance = &ProbeService{
-			client: client,
-			probes: make(map[string]*Probe),
+			client:   client,
+			probes:   make(map[string]*Probe),
+			eventBus: eventBus,
 		}
 	})
 	return instance
@@ -138,6 +140,7 @@ func (ps *ProbeService) Delete(name string) error {
 
 // run launch probes in a separate goroutine.
 func (ps *ProbeService) run(probe *Probe) {
+	var oldStatus string
 	for {
 		select {
 		case <-probe.finish:
@@ -145,6 +148,7 @@ func (ps *ProbeService) run(probe *Probe) {
 			return
 		default:
 			resp, err := ps.client.Get(probe.URL)
+			oldStatus = probe.Status
 			if err != nil {
 				probe.Status = "DOWN"
 				log.Printf("<<HTTP(s) PROBE [%s]>> Service targeting [%s] is down.\n", probe.Name, probe.URL)
@@ -157,6 +161,10 @@ func (ps *ProbeService) run(probe *Probe) {
 				log.Printf("<<HTTP(s) PROBE [%s]>> Service targeting [%s] is alive.\n", probe.Name, probe.URL)
 				_ = resp.Body.Close()
 			}
+		}
+		// If the status has changed, we can send an event to the alerter bus...
+		if oldStatus != probe.Status {
+			ps.eventBus <- *probe
 		}
 		time.Sleep(time.Duration(probe.Delay) * time.Second)
 	}

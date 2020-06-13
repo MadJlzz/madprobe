@@ -114,3 +114,6 @@ modules.xml
 # Generated self signed certificates
 configs/certs/*.csr
 configs/certs/*.pem
+
+# Madprobe configuration
+madprobe.yaml

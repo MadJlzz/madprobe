@@ -13,6 +13,8 @@ const (
 	defaultServerCertificate = ""
 	defaultServerKey         = ""
 	defaultCaCertificate     = ""
+	defaultDiscordToken      = ""
+	defaultDiscordChannelId  = ""
 )
 
 type ServerConfiguration struct {
@@ -60,6 +62,8 @@ func initFlags() {
 	flag.String("cert", defaultServerCertificate, "public certificate shown by the server to it's clients")
 	flag.String("key", defaultServerKey, "the server's certificate private key")
 	flag.String("ca-cert", defaultCaCertificate, "the CA certificate")
+	flag.String("discord-token", defaultDiscordToken, "the Discord Token for authentication")
+	flag.String("discord-channel-id", defaultDiscordChannelId, "the Discord channel for posting alerts")
 	flag.Parse()
 	if err := viper.BindPFlags(flag.CommandLine); err != nil {
 		log.Printf("[WARNING] %v\n", err)
