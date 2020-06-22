@@ -4,6 +4,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -34,7 +35,7 @@ type ProbeService struct {
 
 // NewProbeService allow to create a new ProbeService
 // implemented as a singleton.
-func NewProbeService(client *http.Client) (*ProbeService, error) {
+func NewProbeService(client *http.Client) *ProbeService {
 	var err error
 	once.Do(func() {
 		persistenceClient, err2 := persistence.NewPersistenceClient()
@@ -46,9 +47,16 @@ func NewProbeService(client *http.Client) (*ProbeService, error) {
 			client:            client,
 			persistenceClient: persistenceClient,
 		}
-		instance.runAllProbes()
+		err2 = instance.runAllProbes()
+		if err != nil {
+			err = err2
+			return
+		}
 	})
-	return instance, err
+	if err != nil {
+		log.Fatalf("failed to start probe service: %s", err.Error())
+	}
+	return instance
 }
 
 // Create does nothing but registering the given probe.
@@ -59,11 +67,15 @@ func (ps *ProbeService) Create(probe model.Probe) error {
 		return err
 	}
 
-	if ps.persistenceClient.ExistProbeByName(probe.Name) {
+	exist, err := ps.persistenceClient.ExistProbeByName(probe.Name)
+	if err != nil {
+		return err
+	}
+	if exist {
 		return ErrProbeAlreadyExist
 	}
 
-	ps.persistenceClient.InsertProbe(&probe)
+	err = ps.persistenceClient.InsertProbe(&probe)
 	if err != nil {
 		return err
 	}
@@ -77,16 +89,19 @@ func (ps *ProbeService) Create(probe model.Probe) error {
 // Read retrieve a probe with the given name in the system.
 // No validation is required. Returns the probe or ErrProbeNotFound is not probe has been found.
 func (ps *ProbeService) Read(name string) (*model.Probe, error) {
-	probe, ok := ps.persistenceClient.GetProbe(name)
-	if !ok {
+	probe, err := ps.persistenceClient.GetProbe(name)
+	if err != nil {
+		return nil, err
+	}
+	if probe == nil {
 		return nil, ErrProbeNotFound
 	}
 	return probe, nil
 }
 
 // ReadAll retrieve all probes in the system.
-func (ps *ProbeService) ReadAll() []*model.Probe {
-	return ps.persistenceClient.GetAllProbe()
+func (ps *ProbeService) ReadAll() ([]*model.Probe, error) {
+	return ps.persistenceClient.GetAllProbes()
 }
 
 // Update is a bit more complicated.
@@ -96,10 +111,19 @@ func (ps *ProbeService) Update(name string, probe model.Probe) error {
 	if err != nil {
 		return err
 	}
-	if !ps.persistenceClient.ExistProbeByName(name) {
+	exist, err := ps.persistenceClient.ExistProbeByName(name)
+	if err != nil {
+		return err
+	}
+	if !exist {
 		return ErrProbeNotFound
 	}
-	if ps.persistenceClient.ExistProbeByName(probe.Name) && name != probe.Name {
+
+	exist, err = ps.persistenceClient.ExistProbeByName(probe.Name)
+	if err != nil {
+		return err
+	}
+	if exist && name != probe.Name {
 		return ErrProbeAlreadyExist
 	}
 
@@ -107,7 +131,7 @@ func (ps *ProbeService) Update(name string, probe model.Probe) error {
 	if err != nil {
 		return err
 	}
-	ps.persistenceClient.InsertProbe(&probe)
+	err = ps.persistenceClient.InsertProbe(&probe)
 	if err != nil {
 		return err
 	}
@@ -126,18 +150,26 @@ func (ps *ProbeService) Delete(name string) error {
 		return err
 	}
 
-	if !ps.persistenceClient.ExistProbeByName(name) {
+	exist, err := ps.persistenceClient.ExistProbeByName(name)
+	if err != nil {
+		return err
+	}
+	if !exist {
 		return ErrProbeNotFound
 	}
 
 	return ps.persistenceClient.DeleteProbeByName(name)
 }
 
-func (ps *ProbeService) runAllProbes() {
-	probes := ps.persistenceClient.GetAllProbe()
+func (ps *ProbeService) runAllProbes() error {
+	probes, err := ps.persistenceClient.LoadProbes()
+	if err != nil {
+		return fmt.Errorf("fail initial probes loading: %w", err)
+	}
 	for _, probe := range probes {
 		go ps.run(probe)
 	}
+	return nil
 }
 
 // run launch probes in a separate goroutine.

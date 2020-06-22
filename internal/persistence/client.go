@@ -13,8 +13,8 @@ const (
 )
 
 type PersistenceClient struct {
-	probes map[string]*model.Probe
-	boltDB *bolt.DB
+	probeFinishChannels map[string]model.ProbeFinishChannel
+	boltDB              *bolt.DB
 }
 
 func NewPersistenceClient() (*PersistenceClient, error) {
@@ -23,18 +23,22 @@ func NewPersistenceClient() (*PersistenceClient, error) {
 		return nil, err
 	}
 	persistenceClient := &PersistenceClient{
-		probes: make(map[string]*model.Probe),
-		boltDB: boltDB,
+		probeFinishChannels: make(map[string]model.ProbeFinishChannel),
+		boltDB:              boltDB,
 	}
-	probes, err := persistenceClient.readAllStoredProbes()
+	return persistenceClient, nil
+}
+
+func (c *PersistenceClient) LoadProbes() ([]*model.Probe, error) {
+	probes, err := c.GetAllProbes()
 	if err != nil {
 		return nil, err
 	}
 	for _, probe := range probes {
 		probe.Finish = make(chan bool, 1)
-		persistenceClient.probes[probe.Name] = probe
+		c.probeFinishChannels[probe.Name] = probe.Finish
 	}
-	return persistenceClient, nil
+	return probes, nil
 }
 
 func newBoltDBClient() (*bolt.DB, error) {

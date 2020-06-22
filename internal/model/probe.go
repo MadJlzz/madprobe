@@ -7,5 +7,7 @@ type Probe struct {
 	URL    string
 	Status string
 	Delay  uint
-	Finish chan bool
+	Finish ProbeFinishChannel
 }
+
+type ProbeFinishChannel = chan bool

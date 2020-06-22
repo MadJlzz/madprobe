@@ -14,6 +14,14 @@ type probeEntity struct {
 	Delay uint
 }
 
+func (p *probeEntity) toProbe() *model.Probe {
+	return &model.Probe{
+		Name:  p.Name,
+		URL:   p.URL,
+		Delay: p.Delay,
+	}
+}
+
 func newProbeEntity(probe *model.Probe) *probeEntity {
 	// Status and Finish chan not persisted
 	return &probeEntity{
@@ -38,7 +46,7 @@ func (c *PersistenceClient) InsertProbe(probe *model.Probe) error {
 		return fmt.Errorf("failed to insert probe: %w", err)
 	}
 	probe.Finish = make(chan bool, 1)
-	c.probes[probe.Name] = probe
+	c.probeFinishChannels[probe.Name] = probe.Finish
 	return nil
 }
 
@@ -51,36 +59,45 @@ func (c *PersistenceClient) DeleteProbeByName(probeName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete probe: %w", err)
 	}
-	if probe, exist := c.probes[probeName]; exist {
-		probe.Finish <- true
-		delete(c.probes, probe.Name)
+	if finishChannel, exist := c.probeFinishChannels[probeName]; exist {
+		finishChannel <- true
+		delete(c.probeFinishChannels, probeName)
 	}
 	return nil
 }
 
 // ExistByName returns true if probe with this name exist
-func (c *PersistenceClient) ExistProbeByName(probeName string) bool {
-	_, exist := c.probes[probeName]
-	return exist
+func (c *PersistenceClient) ExistProbeByName(probeName string) (bool, error) {
+	probe, err := c.GetProbe(probeName)
+	return probe != nil, err
 }
 
-// GetProbe returns a probe by name
-func (c *PersistenceClient) GetProbe(probeName string) (*model.Probe, bool) {
-	probe, ok := c.probes[probeName]
-	return probe, ok
-}
-
-// GetAllProbe returns all probes
-func (c *PersistenceClient) GetAllProbe() []*model.Probe {
-	var probes []*model.Probe
-	for _, probe := range c.probes {
-		probes = append(probes, probe)
+// GetProbe returns a probe by name, result can be nil if no probe is found
+func (c *PersistenceClient) GetProbe(probeName string) (*model.Probe, error) {
+	var probeEntity probeEntity
+	err := c.boltDB.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(probeBucket))
+		probeBytes := bucket.Get([]byte(probeName))
+		if probeBytes == nil {
+			return nil
+		}
+		err := json.Unmarshal(probeBytes, &probeEntity)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal probe: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve probe: %w", err)
 	}
-	return probes
+	if probeEntity.Name == "" {
+		return nil, nil // No probe found
+	}
+	return probeEntity.toProbe(), nil
 }
 
-// readAllProbes returns all probes in database
-func (c *PersistenceClient) readAllStoredProbes() ([]*model.Probe, error) {
+// GetAllProbe returns all probes in database
+func (c *PersistenceClient) GetAllProbes() ([]*model.Probe, error) {
 	var probes []*model.Probe
 	err := c.boltDB.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(probeBucket))
@@ -98,12 +115,4 @@ func (c *PersistenceClient) readAllStoredProbes() ([]*model.Probe, error) {
 		return nil, fmt.Errorf("failed to read all probes: %w", err)
 	}
 	return probes, nil
-}
-
-func (p *probeEntity) toProbe() *model.Probe {
-	return &model.Probe{
-		Name:  p.Name,
-		URL:   p.URL,
-		Delay: p.Delay,
-	}
 }

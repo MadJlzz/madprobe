@@ -22,10 +22,7 @@ func main() {
 		client = internal.HttpsClient(configuration.CaCertificate)
 	}
 
-	probeService, err := service.NewProbeService(client)
-	if err != nil {
-		log.Fatalln("Failed to create probe service", err)
-	}
+	probeService := service.NewProbeService(client)
 	probeController := controller.NewProbeController(probeService)
 
 	r := mux.NewRouter()
