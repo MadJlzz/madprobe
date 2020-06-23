@@ -2,11 +2,12 @@ package controller
 
 import (
 	"fmt"
-	"github.com/madjlzz/madprobe/internal/service"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/madjlzz/madprobe/internal/model"
 )
 
 func TestCreateProbeHandler(t *testing.T) {
@@ -51,7 +52,7 @@ func TestCreateProbeHandler(t *testing.T) {
 
 type fakeProbeService struct{}
 
-func (ps *fakeProbeService) Create(_ service.Probe) error {
+func (ps *fakeProbeService) Create(_ model.Probe) error {
 	fmt.Println("Calling Create() from mock ProbeService.")
 	return nil
 }
