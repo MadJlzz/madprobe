@@ -6,20 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
-	"github.com/madjlzz/madprobe/internal/service"
+	"github.com/madjlzz/madprobe/internal/prober"
 	"log"
 	"net/http"
 )
-
-// ProbeService represent the interface used
-// to manipulate probes.
-type ProbeService interface {
-	Create(probe service.Probe) error
-	Read(name string) (*service.Probe, error)
-	ReadAll() []*service.Probe
-	Update(name string, probe service.Probe) error
-	Delete(name string) error
-}
 
 // CreateProbeRequest represents the data structure
 // decoded from incoming HTTP request when trying to create a new probe.
@@ -50,12 +40,12 @@ type ProbeResponse struct {
 // ProbeController is the controller
 // exposing endpoints to manage probes.
 type ProbeController struct {
-	ProbeService ProbeService
+	ProbeService prober.ProbeService
 }
 
 // NewProbeController initialize a new ProbeController
 // to expose endpoints for managing probes.
-func NewProbeController(ps ProbeService) ProbeController {
+func NewProbeController(ps prober.ProbeService) ProbeController {
 	return ProbeController{
 		ProbeService: ps,
 	}
@@ -80,14 +70,14 @@ func (pc *ProbeController) Create(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	err = pc.ProbeService.Create(service.Probe{
+	err = pc.ProbeService.Create(prober.Probe{
 		Name:  cpr.Name,
 		URL:   cpr.URL,
 		Delay: cpr.Delay,
 	})
 	if err != nil {
 		switch err {
-		case service.ErrProbeAlreadyExist:
+		case prober.ErrProbeAlreadyExist:
 			http.Error(w, err.Error(), http.StatusConflict)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -108,7 +98,7 @@ func (pc *ProbeController) Read(w http.ResponseWriter, req *http.Request) {
 	probe, err := pc.ProbeService.Read(vars["name"])
 	if err != nil {
 		switch err {
-		case service.ErrProbeNotFound:
+		case prober.ErrProbeNotFound:
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -186,14 +176,14 @@ func (pc *ProbeController) Update(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	err = pc.ProbeService.Update(vars["name"], service.Probe{
+	err = pc.ProbeService.Update(vars["name"], prober.Probe{
 		Name:  upr.Name,
 		URL:   upr.URL,
 		Delay: upr.Delay,
 	})
 	if err != nil {
 		switch err {
-		case service.ErrProbeAlreadyExist:
+		case prober.ErrProbeAlreadyExist:
 			http.Error(w, err.Error(), http.StatusConflict)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -214,7 +204,7 @@ func (pc *ProbeController) Delete(w http.ResponseWriter, req *http.Request) {
 	err := pc.ProbeService.Delete(vars["name"])
 	if err != nil {
 		switch err {
-		case service.ErrProbeNotFound:
+		case prober.ErrProbeNotFound:
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -1,6 +1,6 @@
 // Service contains everything that relates to probe persistence.
 // Validation is made on this layer too.
-package service
+package prober
 
 import (
 	"errors"
@@ -19,35 +19,22 @@ var (
 // Once is an object that will perform exactly one action.
 // It is used to ensure ProbeService is a singleton.
 var once sync.Once
+var instance *service
 
-var instance *ProbeService
-
-// Probe is the model required by the service to manipulate
-// the resource.
-type Probe struct {
-	Name   string
-	URL    string
-	Status string
-	Delay  uint
-	finish chan bool
-}
-
-// ProbeService is an implementation
-// of the interface controller.ProbeService
-type ProbeService struct {
+// ProbeService is an implementation of the interface controller.ProbeService
+type service struct {
 	client   *http.Client
 	probes   map[string]*Probe
-	eventBus chan<- Probe
+	alertBus chan<- Probe
 }
 
-// NewProbeService allow to create a new ProbeService
-// implemented as a singleton.
-func NewProbeService(client *http.Client, eventBus chan<- Probe) *ProbeService {
+// NewProbeService allow to create a new probe service implemented as a singleton.
+func NewProbeService(client *http.Client, alertBus chan<- Probe) *service {
 	once.Do(func() {
-		instance = &ProbeService{
+		instance = &service{
 			client:   client,
 			probes:   make(map[string]*Probe),
-			eventBus: eventBus,
+			alertBus: alertBus,
 		}
 	})
 	return instance
@@ -55,7 +42,7 @@ func NewProbeService(client *http.Client, eventBus chan<- Probe) *ProbeService {
 
 // Create does nothing but registering the given probe.
 // Validation is made before storing the probe to be sure nothing partially configured enters the system.
-func (ps *ProbeService) Create(probe Probe) error {
+func (ps *service) Create(probe Probe) error {
 	err := runValidators(probe, nameInvalid, urlInvalid, delayInvalid)
 	if err != nil {
 		return err
@@ -75,7 +62,7 @@ func (ps *ProbeService) Create(probe Probe) error {
 
 // Read retrieve a probe with the given name in the system.
 // No validation is required. Returns the probe or ErrProbeNotFound is not probe has been found.
-func (ps *ProbeService) Read(name string) (*Probe, error) {
+func (ps *service) Read(name string) (*Probe, error) {
 	probe, ok := ps.probes[name]
 	if !ok {
 		return nil, ErrProbeNotFound
@@ -84,7 +71,7 @@ func (ps *ProbeService) Read(name string) (*Probe, error) {
 }
 
 // ReadAll retrieve all probes in the system.
-func (ps *ProbeService) ReadAll() []*Probe {
+func (ps *service) ReadAll() []*Probe {
 	var probes []*Probe
 	for _, value := range ps.probes {
 		probes = append(probes, value)
@@ -94,7 +81,7 @@ func (ps *ProbeService) ReadAll() []*Probe {
 
 // Update is a bit more complicated.
 // Technically, it deletes the running probe and creates a new one with the given values.
-func (ps *ProbeService) Update(name string, probe Probe) error {
+func (ps *service) Update(name string, probe Probe) error {
 	err := runValidators(probe, nameInvalid, urlInvalid, delayInvalid)
 	if err != nil {
 		return err
@@ -120,7 +107,7 @@ func (ps *ProbeService) Update(name string, probe Probe) error {
 
 // Delete erase an existing probe from the system.
 // Validation is made before deletion to be sure nothing get removed by error.
-func (ps *ProbeService) Delete(name string) error {
+func (ps *service) Delete(name string) error {
 	probe := Probe{Name: name}
 	err := runValidators(probe, nameInvalid)
 	if err != nil {
@@ -139,7 +126,7 @@ func (ps *ProbeService) Delete(name string) error {
 }
 
 // run launch probes in a separate goroutine.
-func (ps *ProbeService) run(probe *Probe) {
+func (ps *service) run(probe *Probe) {
 	var oldStatus string
 	for {
 		select {
@@ -164,7 +151,7 @@ func (ps *ProbeService) run(probe *Probe) {
 		}
 		// If the status has changed, we can send an event to the alerter bus...
 		if oldStatus != probe.Status {
-			ps.eventBus <- *probe
+			ps.alertBus <- *probe
 		}
 		time.Sleep(time.Duration(probe.Delay) * time.Second)
 	}

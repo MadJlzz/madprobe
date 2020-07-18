@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/madjlzz/madprobe/controller"
 	"github.com/madjlzz/madprobe/internal"
 	"github.com/madjlzz/madprobe/internal/alerter"
-	"github.com/madjlzz/madprobe/internal/service"
+	"github.com/madjlzz/madprobe/internal/prober"
 	"log"
 	"net/http"
 	"os"
@@ -23,8 +24,8 @@ func main() {
 	}
 
 	// Event Bus channel to let services communicate.
-	eventBus := make(chan service.Probe)
-	probeService := service.NewProbeService(client, eventBus)
+	alertBus := make(chan prober.Probe)
+	probeService := prober.NewProbeService(client, alertBus)
 	probeController := controller.NewProbeController(probeService)
 
 	r := mux.NewRouter()
@@ -64,8 +65,11 @@ func main() {
 	}()
 
 	// Alerter start at boot time.
-	da := alerter.NewDiscordAlerter()
-	go da.Alert(eventBus)
+	al, err := alerter.NewService(alertBus)
+	if err != nil {
+		fmt.Println(err)
+	}
+	al.Run()
 
 	c := make(chan os.Signal, 1)
 	// We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C)
@@ -81,7 +85,7 @@ func main() {
 	// Doesn't block if no connections, but will otherwise wait
 	// until the timeout deadline.
 	_ = srv.Shutdown(ctx)
-	_ = da.Close()
+	_ = al.Close()
 	// Optionally, you could run srv.Shutdown in a goroutine and block on
 	// <-ctx.Done() if your application should wait for other services
 	// to finalize based on context cancellation.

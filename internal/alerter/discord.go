@@ -3,7 +3,7 @@ package alerter
 import (
 	"fmt"
 	"github.com/bwmarrin/discordgo"
-	"github.com/madjlzz/madprobe/internal/service"
+	"github.com/madjlzz/madprobe/internal/prober"
 	"github.com/spf13/viper"
 	"log"
 	"time"
@@ -30,12 +30,8 @@ func NewDiscordAlerter() *DiscordAlerter {
 	}
 }
 
-func (da *DiscordAlerter) Close() error {
-	return da.session.Close()
-}
-
-func (da *DiscordAlerter) Alert(eventBus <-chan service.Probe) {
-	var probe service.Probe
+func (da *DiscordAlerter) Alert(eventBus <-chan prober.Probe) {
+	var probe prober.Probe
 	for {
 		select {
 		case probe = <-eventBus:
@@ -48,4 +44,8 @@ func (da *DiscordAlerter) Alert(eventBus <-chan service.Probe) {
 			time.Sleep(time.Duration(probe.Delay) * time.Second)
 		}
 	}
+}
+
+func (da *DiscordAlerter) Close() error {
+	return da.session.Close()
 }
