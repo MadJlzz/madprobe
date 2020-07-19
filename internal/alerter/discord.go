@@ -4,29 +4,29 @@ import (
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"github.com/madjlzz/madprobe/internal/prober"
-	"github.com/spf13/viper"
 	"log"
 	"time"
 )
 
 func NewDiscordAlerter() *DiscordAlerter {
-	channelId := viper.GetString("discord-channel-id")
-	token := viper.GetString("discord-token")
-
-	discord, err := discordgo.New("Bot " + token)
+	dc, err := NewDiscordConfiguration()
 	if err != nil {
-		log.Printf("an unexpected error occured while trying to initialize discord client")
+		log.Printf("[WARNING] discord configuration contains an error/errors. got: [%v]\n", err)
 		return nil
 	}
-
-	err = discord.Open()
+	session, err := discordgo.New("Bot " + dc.Token)
 	if err != nil {
-		log.Println(err)
+		log.Printf("[WARNING] an error occured while trying to initialize session client. got: [%v]\n", err)
+		return nil
 	}
-
+	err = session.Open()
+	if err != nil {
+		log.Printf("[WARNING] could not open Websocket to communicate using the session client. got: [%v]\n", err)
+		return nil
+	}
 	return &DiscordAlerter{
-		channelID: channelId,
-		session:   discord,
+		channelID: dc.ChannelID,
+		session:   session,
 	}
 }
 

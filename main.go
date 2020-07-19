@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/madjlzz/madprobe/controller"
-	"github.com/madjlzz/madprobe/internal"
 	"github.com/madjlzz/madprobe/internal/alerter"
 	"github.com/madjlzz/madprobe/internal/prober"
+	"github.com/madjlzz/madprobe/util"
 	"log"
 	"net/http"
 	"os"
@@ -16,11 +16,11 @@ import (
 )
 
 func main() {
-	configuration := internal.NewServerConfiguration()
+	configuration := util.NewServerConfiguration()
 
 	client := http.DefaultClient
 	if len(configuration.CaCertificate) > 0 {
-		client = internal.HttpsClient(configuration.CaCertificate)
+		client = util.HttpsClient(configuration.CaCertificate)
 	}
 
 	// Event Bus channel to let services communicate.
@@ -67,7 +67,7 @@ func main() {
 	// Alerter start at boot time.
 	al, err := alerter.NewService(alertBus)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("[WARNING] alerter module wasn't able to start. got: %v\n", err)
 	}
 	al.Run()
 
