@@ -4,6 +4,8 @@ package prober
 
 import (
 	"errors"
+	"fmt"
+	"github.com/madjlzz/madprobe/internal/persistence"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -23,20 +25,34 @@ var instance *service
 
 // ProbeService is an implementation of the interface controller.ProbeService
 type service struct {
-	client   *http.Client
-	probes   map[string]*Probe
-	alertBus chan<- Probe
+	client            *http.Client
+	persistenceClient *persistence.PersistenceClient
+	alertBus          chan<- Probe
 }
 
 // NewProbeService allow to create a new probe service implemented as a singleton.
 func NewProbeService(client *http.Client, alertBus chan<- Probe) *service {
+	var err error
 	once.Do(func() {
+		persistenceClient, pErr := persistence.NewPersistenceClient()
+		if err != nil {
+			err = pErr
+			return
+		}
 		instance = &service{
-			client:   client,
-			probes:   make(map[string]*Probe),
-			alertBus: alertBus,
+			client:            client,
+			persistenceClient: persistenceClient,
+			alertBus:          alertBus,
+		}
+		pErr = instance.runAllProbes()
+		if err != nil {
+			err = pErr
+			return
 		}
 	})
+	if err != nil {
+		log.Fatalf("failed to start probe service: %s", err.Error())
+	}
 	return instance
 }
 
@@ -47,14 +63,21 @@ func (ps *service) Create(probe Probe) error {
 	if err != nil {
 		return err
 	}
-	if _, ok := ps.probes[probe.Name]; ok {
+
+	exist, err := ps.persistenceClient.ExistProbeByName(probe.Name)
+	if err != nil {
+		return err
+	}
+	if exist {
 		return ErrProbeAlreadyExist
 	}
 
-	probe.finish = make(chan bool, 1)
-	ps.probes[probe.Name] = &probe
+	err = ps.persistenceClient.InsertProbe(&probe)
+	if err != nil {
+		return err
+	}
 
-	go ps.run(ps.probes[probe.Name])
+	go ps.run(&probe)
 
 	log.Printf("Probe [%s] has been successfuly created.\n", probe.Name)
 	return nil
@@ -63,20 +86,19 @@ func (ps *service) Create(probe Probe) error {
 // Read retrieve a probe with the given name in the system.
 // No validation is required. Returns the probe or ErrProbeNotFound is not probe has been found.
 func (ps *service) Read(name string) (*Probe, error) {
-	probe, ok := ps.probes[name]
-	if !ok {
+	probe, err := ps.persistenceClient.GetProbe(name)
+	if err != nil {
+		return nil, err
+	}
+	if probe == nil {
 		return nil, ErrProbeNotFound
 	}
 	return probe, nil
 }
 
 // ReadAll retrieve all probes in the system.
-func (ps *service) ReadAll() []*Probe {
-	var probes []*Probe
-	for _, value := range ps.probes {
-		probes = append(probes, value)
-	}
-	return probes
+func (ps *service) ReadAll() ([]*Probe, error) {
+	return ps.persistenceClient.GetAllProbes()
 }
 
 // Update is a bit more complicated.
@@ -86,20 +108,31 @@ func (ps *service) Update(name string, probe Probe) error {
 	if err != nil {
 		return err
 	}
-	if _, ok := ps.probes[name]; !ok {
+	exist, err := ps.persistenceClient.ExistProbeByName(name)
+	if err != nil {
+		return err
+	}
+	if !exist {
 		return ErrProbeNotFound
 	}
-	if _, ok := ps.probes[probe.Name]; name != probe.Name && ok {
+
+	exist, err = ps.persistenceClient.ExistProbeByName(probe.Name)
+	if err != nil {
+		return err
+	}
+	if exist && name != probe.Name {
 		return ErrProbeAlreadyExist
 	}
 
-	ps.probes[name].finish <- true
-	delete(ps.probes, name)
-
-	probe.finish = make(chan bool, 1)
-	ps.probes[probe.Name] = &probe
-
-	go ps.run(ps.probes[probe.Name])
+	err = ps.persistenceClient.DeleteProbeByName(name)
+	if err != nil {
+		return err
+	}
+	err = ps.persistenceClient.InsertProbe(&probe)
+	if err != nil {
+		return err
+	}
+	go ps.run(&probe)
 
 	log.Printf("Probe [%s] has been successfuly updated.\n", probe.Name)
 	return nil
@@ -114,14 +147,25 @@ func (ps *service) Delete(name string) error {
 		return err
 	}
 
-	mapProbe, ok := ps.probes[name]
-	if !ok {
+	exist, err := ps.persistenceClient.ExistProbeByName(name)
+	if err != nil {
+		return err
+	}
+	if !exist {
 		return ErrProbeNotFound
 	}
 
-	mapProbe.finish <- true
-	delete(ps.probes, mapProbe.Name)
+	return ps.persistenceClient.DeleteProbeByName(name)
+}
 
+func (ps *service) runAllProbes() error {
+	probes, err := ps.persistenceClient.LoadProbes()
+	if err != nil {
+		return fmt.Errorf("fail initial probes loading: %w", err)
+	}
+	for _, probe := range probes {
+		go ps.run(probe)
+	}
 	return nil
 }
 
@@ -130,7 +174,7 @@ func (ps *service) run(probe *Probe) {
 	var oldStatus string
 	for {
 		select {
-		case <-probe.finish:
+		case <-probe.Finish:
 			log.Printf("<<HTTP PROBE [%s]>> Stopping probe...\n", probe.Name)
 			return
 		default:

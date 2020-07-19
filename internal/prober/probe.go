@@ -4,7 +4,7 @@ package prober
 type ProbeService interface {
 	Create(probe Probe) error
 	Read(name string) (*Probe, error)
-	ReadAll() []*Probe
+	ReadAll() ([]*Probe, error)
 	Update(name string, probe Probe) error
 	Delete(name string) error
 }
@@ -15,5 +15,7 @@ type Probe struct {
 	URL    string
 	Status string
 	Delay  uint
-	finish chan bool
+	Finish ProbeFinishChannel
 }
+
+type ProbeFinishChannel = chan bool

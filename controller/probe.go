@@ -131,7 +131,11 @@ func (pc *ProbeController) Read(w http.ResponseWriter, req *http.Request) {
 //
 // GET /api/v1/probe
 func (pc *ProbeController) ReadAll(w http.ResponseWriter, req *http.Request) {
-	probes := pc.ProbeService.ReadAll()
+	probes, err := pc.ProbeService.ReadAll()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	pr := make([]ProbeResponse, 0)
 	for _, value := range probes {
@@ -143,7 +147,7 @@ func (pc *ProbeController) ReadAll(w http.ResponseWriter, req *http.Request) {
 		})
 	}
 
-	err := encodeJSONBody(w, &pr)
+	err = encodeJSONBody(w, &pr)
 	if err != nil {
 		var mr *malformedContent
 		if errors.As(err, &mr) {
