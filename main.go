@@ -6,6 +6,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/madjlzz/madprobe/controller"
 	"github.com/madjlzz/madprobe/internal/alerter"
+	"github.com/madjlzz/madprobe/internal/persistence"
 	"github.com/madjlzz/madprobe/internal/prober"
 	"github.com/madjlzz/madprobe/util"
 	"log"
@@ -25,7 +26,13 @@ func main() {
 
 	// Event Bus channel to let services communicate.
 	alertBus := make(chan prober.Probe)
-	probeService := prober.NewProbeService(client, alertBus)
+	// TODO: should be passed as a property...
+	persistenceClient, err := persistence.NewBoltDBClient("madprobe.db")
+	if err != nil {
+		log.Fatalf("[ERROR] persistence module wasn't able to initialize. got: %v\n", err)
+	}
+
+	probeService := prober.NewProbeService(client, persistenceClient, alertBus)
 	probeController := controller.NewProbeController(probeService)
 
 	r := mux.NewRouter()
@@ -35,8 +42,6 @@ func main() {
 		Methods(http.MethodGet)
 	r.HandleFunc("/api/v1/probe", probeController.ReadAll).
 		Methods(http.MethodGet)
-	r.HandleFunc("/api/v1/probe/{name}", probeController.Update).
-		Methods(http.MethodPut)
 	r.HandleFunc("/api/v1/probe/{name}", probeController.Delete).
 		Methods(http.MethodDelete)
 
@@ -79,13 +84,14 @@ func main() {
 	// Block until we receive our signal.
 	<-c
 
-	// Create a deadline to wait for.
+	// Insert a deadline to wait for.
 	ctx, cancel := context.WithTimeout(context.Background(), configuration.Wait)
 	defer cancel()
 	// Doesn't block if no connections, but will otherwise wait
 	// until the timeout deadline.
 	_ = srv.Shutdown(ctx)
 	_ = al.Close()
+	_ = persistenceClient.Close()
 	// Optionally, you could run srv.Shutdown in a goroutine and block on
 	// <-ctx.Done() if your application should wait for other services
 	// to finalize based on context cancellation.

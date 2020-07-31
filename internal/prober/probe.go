@@ -2,10 +2,9 @@ package prober
 
 // ProbeService represent the interface used to manipulate probes.
 type ProbeService interface {
-	Create(probe Probe) error
-	Read(name string) (*Probe, error)
-	ReadAll() ([]*Probe, error)
-	Update(name string, probe Probe) error
+	Insert(probe Probe) error
+	Get(name string) (*Probe, error)
+	GetAll() ([]*Probe, error)
 	Delete(name string) error
 }
 
@@ -15,7 +14,15 @@ type Probe struct {
 	URL    string
 	Status string
 	Delay  uint
-	Finish ProbeFinishChannel
+	Finish chan bool
 }
 
-type ProbeFinishChannel = chan bool
+// Creates a new Probe with the given parameters.
+func NewProbe(name, URL string, delay uint) *Probe {
+	return &Probe{
+		Name:   name,
+		URL:    URL,
+		Delay:  delay,
+		Finish: make(chan bool),
+	}
+}

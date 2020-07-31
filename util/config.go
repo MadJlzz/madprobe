@@ -27,7 +27,7 @@ var DefaultServerConfiguration = &ServerConfiguration{
 	CaCertificate:     "",
 }
 
-// Create a new ServerConfiguration with default values or values coming from Viper.
+// Insert a new ServerConfiguration with default values or values coming from Viper.
 func NewServerConfiguration() *ServerConfiguration {
 	return &ServerConfiguration{
 		Wait:              viper.GetDuration("graceful-timeout"),
