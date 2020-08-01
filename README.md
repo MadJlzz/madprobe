@@ -77,14 +77,6 @@ Endpoints:
 ````
   - GET /api/v1/probe/{name}
   - GET /api/v1/probe
-  - PUT /api/v1/probe/{name}
-````   
-{
-    "Name": "simple-service-http",
-    "URL": "http://localhost:8080/actuator/health",
-    "Delay": 5
-}
-````
   - DELETE /api/v1/probe/{name}
 
 ## Contributing

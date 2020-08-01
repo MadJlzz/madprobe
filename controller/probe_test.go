@@ -2,23 +2,22 @@ package controller
 
 import (
 	"fmt"
+	"github.com/madjlzz/madprobe/internal/prober"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"github.com/madjlzz/madprobe/internal/model"
 )
 
 func TestCreateProbeHandler(t *testing.T) {
-	// Create the JSON body as a string.
+	// Insert the JSON body as a string.
 	jsonBody := `{
       "Name": "simple-service-http",
       "URL": "http://localhost:8080/actuator/health",
       "Delay": 5
     }`
 
-	// Create a request to pass to our handler. We don't have any query parameters for now, so we'll
+	// Insert a request to pass to our handler. We don't have any query parameters for now, so we'll
 	// pass 'nil' as the third parameter.
 	req, err := http.NewRequest(http.MethodPost, "/api/v1/probe/create", strings.NewReader(jsonBody))
 	if err != nil {
@@ -52,7 +51,7 @@ func TestCreateProbeHandler(t *testing.T) {
 
 type fakeProbeService struct{}
 
-func (ps *fakeProbeService) Create(_ model.Probe) error {
-	fmt.Println("Calling Create() from mock ProbeService.")
+func (ps *fakeProbeService) Create(_ prober.Probe) error {
+	fmt.Println("Calling Insert() from mock ProbeService.")
 	return nil
 }

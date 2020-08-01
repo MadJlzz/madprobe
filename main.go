@@ -2,27 +2,37 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"github.com/gorilla/mux"
+	"github.com/madjlzz/madprobe/controller"
+	"github.com/madjlzz/madprobe/internal/alerter"
+	"github.com/madjlzz/madprobe/internal/persistence"
+	"github.com/madjlzz/madprobe/internal/prober"
+	"github.com/madjlzz/madprobe/util"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
-
-	"github.com/gorilla/mux"
-	"github.com/madjlzz/madprobe/controller"
-	"github.com/madjlzz/madprobe/internal"
-	"github.com/madjlzz/madprobe/internal/service"
 )
 
 func main() {
-	configuration := internal.NewServerConfiguration()
+	configuration := util.NewServerConfiguration()
 
 	client := http.DefaultClient
 	if len(configuration.CaCertificate) > 0 {
-		client = internal.HttpsClient(configuration.CaCertificate)
+		client = util.HttpsClient(configuration.CaCertificate)
 	}
 
-	probeService := service.NewProbeService(client)
+	// Event Bus channel to let services communicate.
+	alertBus := make(chan prober.Probe)
+	// TODO: should be passed as a property...
+	persistenceClient, err := persistence.NewBoltDBClient("madprobe.db")
+	if err != nil {
+		log.Fatalf("[ERROR] persistence module wasn't able to initialize. got: %v\n", err)
+	}
+
+	probeService := prober.NewProbeService(client, persistenceClient, alertBus)
 	probeController := controller.NewProbeController(probeService)
 
 	r := mux.NewRouter()
@@ -32,8 +42,6 @@ func main() {
 		Methods(http.MethodGet)
 	r.HandleFunc("/api/v1/probe", probeController.ReadAll).
 		Methods(http.MethodGet)
-	r.HandleFunc("/api/v1/probe/{name}", probeController.Update).
-		Methods(http.MethodPut)
 	r.HandleFunc("/api/v1/probe/{name}", probeController.Delete).
 		Methods(http.MethodDelete)
 
@@ -61,6 +69,13 @@ func main() {
 		}
 	}()
 
+	// Alerter start at boot time.
+	al, err := alerter.NewService(alertBus)
+	if err != nil {
+		fmt.Printf("[WARNING] alerter module wasn't able to start. got: %v\n", err)
+	}
+	al.Run()
+
 	c := make(chan os.Signal, 1)
 	// We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C)
 	// SIGKILL, SIGQUIT or SIGTERM (Ctrl+/) will not be caught.
@@ -69,12 +84,14 @@ func main() {
 	// Block until we receive our signal.
 	<-c
 
-	// Create a deadline to wait for.
+	// Insert a deadline to wait for.
 	ctx, cancel := context.WithTimeout(context.Background(), configuration.Wait)
 	defer cancel()
 	// Doesn't block if no connections, but will otherwise wait
 	// until the timeout deadline.
 	_ = srv.Shutdown(ctx)
+	_ = al.Close()
+	_ = persistenceClient.Close()
 	// Optionally, you could run srv.Shutdown in a goroutine and block on
 	// <-ctx.Done() if your application should wait for other services
 	// to finalize based on context cancellation.
