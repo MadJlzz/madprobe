@@ -1,15 +1,6 @@
 package controller
 
-import (
-	"fmt"
-	"github.com/madjlzz/madprobe/internal/prober"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"testing"
-)
-
-func TestCreateProbeHandler(t *testing.T) {
+/*func TestCreateProbeHandler(t *testing.T) {
 	// Insert the JSON body as a string.
 	jsonBody := `{
       "Name": "simple-service-http",
@@ -54,4 +45,4 @@ type fakeProbeService struct{}
 func (ps *fakeProbeService) Create(_ prober.Probe) error {
 	fmt.Println("Calling Insert() from mock ProbeService.")
 	return nil
-}
+}*/

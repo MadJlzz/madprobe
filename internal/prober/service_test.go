@@ -1,41 +1,63 @@
 package prober
 
 import (
-	"fmt"
+	"errors"
+	"github.com/golang/mock/gomock"
+	"github.com/madjlzz/madprobe/internal/mock"
 	"github.com/madjlzz/madprobe/internal/persistence"
 	"testing"
 )
 
-type mockPersistentClient struct{}
-
-func (p *mockPersistentClient) Insert(entity *persistence.Entity) error {
-	fmt.Println("[INFO] Insert mock.")
-	return nil
-}
-
-func (p *mockPersistentClient) Delete(name string) error {
-	fmt.Println("[INFO] Delete mock.")
-	return nil
-}
-
-func (p *mockPersistentClient) Get(name string) (*persistence.Entity, error) {
-	fmt.Println("[INFO] Get mock.")
-	return nil, nil
-}
-
-func (p *mockPersistentClient) GetAll() ([]*persistence.Entity, error) {
-	fmt.Println("[INFO] GetAll mock.")
-	return nil, nil
-}
-
 func TestNewProbeServiceIsSingleton(t *testing.T) {
-	s1, s2 := NewProbeService(nil, nil, nil), NewProbeService(nil, nil, nil)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	m := mock.NewMockPersister(ctrl)
+	m.EXPECT().GetAll().Return([]*persistence.Entity{}, nil).AnyTimes()
+
+	s1, s2 := NewProbeService(nil, m, nil), NewProbeService(nil, nil, nil)
 	if s1 != s2 {
 		t.Errorf("service should be a singleton. got [%+v], want [%+v]\n", s1, s2)
 	}
 }
 
-func TestCreateReturnErrorOnValidationFailure(t *testing.T) {
-	// s := NewProbeService(nil, &mockPersistentClient{}, nil)
-	// p := NewProbe("", "", 0)
+func TestInsertReturnErrorOnValidationFailure(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	m := mock.NewMockPersister(ctrl)
+	m.EXPECT().GetAll().Return([]*persistence.Entity{}, nil).AnyTimes()
+
+	s := NewProbeService(nil, m, nil)
+	p := NewProbe("", "", 0)
+
+	err := s.Insert(*p)
+	if err == nil {
+		t.Error("bad insert data should result in an validation error")
+	}
+	if _, ok := err.(*validatorError); !ok {
+		t.Error("error should be a validation error")
+	}
+}
+
+func TestInsertReturnErrorOnGetFailure(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	m := mock.NewMockPersister(ctrl)
+	m.EXPECT().GetAll().Return([]*persistence.Entity{}, nil).AnyTimes()
+
+	m.
+		EXPECT().
+		Get(gomock.Any()).
+		Return(nil, errors.New("mock Get method returns error")).
+		Times(1)
+
+	s := NewProbeService(nil, m, nil)
+	p := NewProbe("TheName", "http://localhost:8080/", 5)
+
+	err := s.Insert(*p)
+	if err == nil {
+		t.Error("failing persistent layer should result in an error")
+	}
 }
