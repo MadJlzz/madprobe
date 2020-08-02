@@ -8,19 +8,6 @@ import (
 	"testing"
 )
 
-func TestNewProbeServiceIsSingleton(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	m := mock.NewMockPersister(ctrl)
-	m.EXPECT().GetAll().Return([]*persistence.Entity{}, nil).AnyTimes()
-
-	s1, s2 := NewProbeService(nil, m, nil), NewProbeService(nil, nil, nil)
-	if s1 != s2 {
-		t.Errorf("service should be a singleton. got [%+v], want [%+v]\n", s1, s2)
-	}
-}
-
 func TestInsertReturnErrorOnValidationFailure(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

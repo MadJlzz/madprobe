@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"sync"
 	"time"
 )
 
@@ -20,9 +19,6 @@ var (
 	ErrProbeNotFound     = errors.New("probe was not found")
 )
 
-// Once is an object that will perform exactly one action.
-// It is used to ensure ProbeService is a singleton.
-var once sync.Once
 var instance *service
 
 // ProbeService is an implementation of the interface controller.ProbeService
@@ -35,16 +31,14 @@ type service struct {
 
 // NewProbeService allow to create a new probe service implemented as a singleton.
 func NewProbeService(httpClient *http.Client, persister persistence.Persister, alertBus chan<- Probe) *service {
-	var err error
-	once.Do(func() {
-		instance = &service{
-			client:    httpClient,
-			persister: persister,
-			alertBus:  alertBus,
-			probes:    make(map[string]*Probe),
-		}
-		err = instance.runProbes()
-	})
+	instance = &service{
+		client:    httpClient,
+		persister: persister,
+		alertBus:  alertBus,
+		probes:    make(map[string]*Probe),
+	}
+
+	err := instance.runProbes()
 	if err != nil {
 		log.Fatalf("failed to start probe service: %s", err.Error())
 	}
