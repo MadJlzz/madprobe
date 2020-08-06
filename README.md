@@ -1,5 +1,7 @@
 # Madprobe
 [![Go report](https://goreportcard.com/badge/github.com/MadJlzz/madprobe)](https://goreportcard.com/report/github.com/MadJlzz/madprobe)
+[![Discord](https://img.shields.io/discord/463752820026376202.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.gg/egZWSRr)
+
 
 This project has been made to provide companies wanting simple aliveness probe to be easily installed on their systems.
 
@@ -83,6 +85,10 @@ Endpoints:
 
 I'll be more than happy to have feedback on the way I designed this application. Things can always be done better and
 I m eager to learn what could be improved!
+
+## Support
+
+For any support request, raise an issue or join us on [Discord](https://discord.gg/egZWSRr)
 
 ## License
 
