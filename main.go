@@ -32,7 +32,8 @@ func main() {
 		log.Fatalf("[ERROR] persistence module wasn't able to initialize. got: %v\n", err)
 	}
 
-	probeService := prober.NewProbeService(client, persistenceClient, alertBus)
+	probeRunner := prober.NewProbeRunner(client, alertBus)
+	probeService := prober.NewProbeService(probeRunner, persistenceClient)
 	probeController := controller.NewProbeController(probeService)
 
 	r := mux.NewRouter()
