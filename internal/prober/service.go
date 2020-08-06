@@ -5,11 +5,7 @@ package prober
 import (
 	"errors"
 	"github.com/madjlzz/madprobe/internal/persistence"
-	"io/ioutil"
 	"log"
-	"net/http"
-	"sync"
-	"time"
 )
 
 const downStatus = "DOWN"
@@ -20,31 +16,24 @@ var (
 	ErrProbeNotFound     = errors.New("probe was not found")
 )
 
-// Once is an object that will perform exactly one action.
-// It is used to ensure ProbeService is a singleton.
-var once sync.Once
 var instance *service
 
-// ProbeService is an implementation of the interface controller.ProbeService
+// service is an implementation of ProbeService
 type service struct {
-	client    *http.Client
+	runner    ProbeRunner
 	persister persistence.Persister
-	alertBus  chan<- Probe
 	probes    map[string]*Probe
 }
 
-// NewProbeService allow to create a new probe service implemented as a singleton.
-func NewProbeService(httpClient *http.Client, persister persistence.Persister, alertBus chan<- Probe) *service {
-	var err error
-	once.Do(func() {
-		instance = &service{
-			client:    httpClient,
-			persister: persister,
-			alertBus:  alertBus,
-			probes:    make(map[string]*Probe),
-		}
-		err = instance.runProbes()
-	})
+// NewProbeService allow to create a new probe service.
+func NewProbeService(runner ProbeRunner, persister persistence.Persister) *service {
+	instance = &service{
+		runner:    runner,
+		persister: persister,
+		probes:    make(map[string]*Probe),
+	}
+
+	err := instance.runProbes()
 	if err != nil {
 		log.Fatalf("failed to start probe service: %s", err.Error())
 	}
@@ -64,7 +53,7 @@ func (ps *service) Insert(probe Probe) error {
 	if err != nil {
 		return err
 	}
-	if entity.Name != "" {
+	if entity != nil && entity.Name != "" {
 		return ErrProbeAlreadyExist
 	}
 
@@ -75,7 +64,7 @@ func (ps *service) Insert(probe Probe) error {
 	}
 
 	ps.probes[probe.Name] = &probe
-	go ps.run(&probe)
+	go ps.runner.Run(&probe)
 
 	log.Printf("Probe [%s] has been successfuly created.\n", probe.Name)
 	return nil
@@ -127,38 +116,6 @@ func (ps *service) Delete(name string) error {
 	return nil
 }
 
-// run launches probes in a separate goroutine.
-func (ps *service) run(probe *Probe) {
-	var oldStatus string
-	for {
-		select {
-		case <-probe.Finish:
-			log.Printf("<<HTTP PROBE [%s]>> Stopping probe...\n", probe.Name)
-			return
-		default:
-			resp, err := ps.client.Get(probe.URL)
-			oldStatus = probe.Status
-			if err != nil {
-				probe.Status = downStatus
-				log.Printf("<<HTTP(s) PROBE [%s]>> Service targeting [%s] is down.\n", probe.Name, probe.URL)
-			} else if resp.StatusCode != 200 {
-				b, _ := ioutil.ReadAll(resp.Body)
-				probe.Status = downStatus
-				log.Printf("<<HTTP(s) PROBE [%s]>> Service targeting [%s] returned an error. got: ['%v']\n", probe.Name, probe.URL, string(b))
-			} else {
-				probe.Status = upStatus
-				log.Printf("<<HTTP(s) PROBE [%s]>> Service targeting [%s] is alive.\n", probe.Name, probe.URL)
-				_ = resp.Body.Close()
-			}
-		}
-		// If the status has changed, we can send an event to the alerter bus...
-		if oldStatus != probe.Status {
-			ps.alertBus <- *probe
-		}
-		time.Sleep(time.Duration(probe.Delay) * time.Second)
-	}
-}
-
 func (ps *service) runProbes() error {
 	entities, err := ps.persister.GetAll()
 	if err != nil {
@@ -167,7 +124,7 @@ func (ps *service) runProbes() error {
 	for _, entity := range entities {
 		probe := NewProbe(entity.Name, entity.URL, entity.Delay)
 		ps.probes[entity.Name] = probe
-		go ps.run(probe)
+		go ps.runner.Run(probe)
 	}
 	return nil
 }

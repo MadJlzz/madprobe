@@ -4,15 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/madjlzz/madprobe/internal/prober"
-	"sync"
 )
 
 // Error thrown whenever the alert bus passed to the service is not initialized.
 var ErrAlertBusNotReady = errors.New("bus should be initialized for alerting to work")
 
-// Once is an object that will perform exactly one action.
-// It is used to ensure the service is a singleton.
-var once sync.Once
 var instance *service
 
 type service struct {
@@ -26,12 +22,10 @@ func NewService(alertBus <-chan prober.Probe) (*service, error) {
 		return nil, ErrAlertBusNotReady
 	}
 	alerters := []Alerter{NewDiscordAlerter()}
-	once.Do(func() {
-		instance = &service{
-			alertBus: alertBus,
-			alerters: filter(alerters),
-		}
-	})
+	instance = &service{
+		alertBus: alertBus,
+		alerters: filter(alerters),
+	}
 	return instance, nil
 }
 

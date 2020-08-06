@@ -8,6 +8,12 @@ type ProbeService interface {
 	Delete(name string) error
 }
 
+// TODO: we need a solution to decouple Run() from the package prober so that it becomes independent.
+// ProbeRunner contract purpose is to run a probe.
+type ProbeRunner interface {
+	Run(probe *Probe)
+}
+
 // Probe is the model required by the service to manipulate the resource.
 type Probe struct {
 	Name   string
